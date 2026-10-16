@@ -67,7 +67,8 @@ class _LogsPageState extends State<LogsPage> {
                             color: t.violet,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
-                              BoxShadow(color: t.violet.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4)),
+                              BoxShadow(
+                                  color: t.violet.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4)),
                             ],
                           ),
                           child: Icon(Icons.notes_rounded, color: t.onAccent, size: 22),
@@ -78,7 +79,8 @@ class _LogsPageState extends State<LogsPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('Logs',
-                                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.7, color: t.text)),
+                                  style: TextStyle(
+                                      fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.7, color: t.text)),
                               Text('${store.logs.length} entries',
                                   style: appInspectMono.copyWith(fontSize: 12, color: t.textSecondary, height: 1.3)),
                             ],
@@ -98,7 +100,8 @@ class _LogsPageState extends State<LogsPage> {
                           onPressed: store.logs.isEmpty ? null : store.clearLogs,
                         ),
                         const SizedBox(width: 8),
-                        const NlIconButton(icon: Icons.close_rounded, tooltip: 'Close AppInspect', onPressed: AppInspect.close),
+                        const NlIconButton(
+                            icon: Icons.close_rounded, tooltip: 'Close AppInspect', onPressed: AppInspect.close),
                       ],
                     ),
                   ),
@@ -110,7 +113,11 @@ class _LogsPageState extends State<LogsPage> {
                       children: [
                         Expanded(
                           child: NlStatTile(
-                              label: 'All', value: store.logs.length, color: t.accent, selected: _level == null, onTap: () => _pick(null)),
+                              label: 'All',
+                              value: store.logs.length,
+                              color: t.accent,
+                              selected: _level == null,
+                              onTap: () => _pick(null)),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -251,13 +258,15 @@ class _LogCardState extends State<_LogCard> {
         child: NlPressable(
           pressedScale: 0.99,
           onTap: () => setState(() => _open = !_open),
-          onLongPress: () => copyText(context, details == null ? log.message : '${log.message}\n$details', 'Log entry copied'),
+          onLongPress: () =>
+              copyText(context, details == null ? log.message : '${log.message}\n$details', 'Log entry copied'),
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: t.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: log.level == AppInspectLogLevel.error ? t.err.withValues(alpha: 0.35) : t.border),
+              border:
+                  Border.all(color: log.level == AppInspectLogLevel.error ? t.err.withValues(alpha: 0.35) : t.border),
               boxShadow: t.cardShadow,
             ),
             child: Column(
@@ -294,7 +303,8 @@ class _LogCardState extends State<_LogCard> {
                   log.message,
                   maxLines: _open ? null : 4,
                   overflow: _open ? TextOverflow.visible : TextOverflow.ellipsis,
-                  style: appInspectMono.copyWith(fontSize: 12.5, color: log.level == AppInspectLogLevel.error ? t.err : t.text),
+                  style: appInspectMono.copyWith(
+                      fontSize: 12.5, color: log.level == AppInspectLogLevel.error ? t.err : t.text),
                 ),
                 AnimatedSize(
                   duration: const Duration(milliseconds: 240),

@@ -17,8 +17,7 @@ import 'store.dart';
 import 'ui/overlay.dart';
 
 /// The navigator for the inspector's own pages. Never the app's navigator.
-final GlobalKey<NavigatorState> appInspectNavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'AppInspect');
+final GlobalKey<NavigatorState> appInspectNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'AppInspect');
 
 /// The app without AppInspect on top. Bug-report screenshots are taken from it.
 final GlobalKey appInspectAppKey = GlobalKey(debugLabel: 'AppInspectApp');
@@ -58,8 +57,7 @@ abstract final class AppInspect {
   static final ValueNotifier<bool> darkTheme = ValueNotifier<bool>(false);
 
   /// Calls slower than this are flagged. People can change it in Settings.
-  static final ValueNotifier<Duration> slowThreshold =
-      ValueNotifier<Duration>(const Duration(seconds: 1));
+  static final ValueNotifier<Duration> slowThreshold = ValueNotifier<Duration>(const Duration(seconds: 1));
 
   static bool _unlocked = false;
   static bool _backHandlerInstalled = false;
@@ -135,8 +133,7 @@ abstract final class AppInspect {
     StackTrace? stackTrace,
   }) {
     if (!isEnabled) return;
-    store.addLog(level, error == null ? message : '$message: $error',
-        source: 'App', details: stackTrace?.toString());
+    store.addLog(level, error == null ? message : '$message: $error', source: 'App', details: stackTrace?.toString());
   }
 
   /// Parses [json] with [fromJson]. If it throws, AppInspect links the error to

@@ -273,10 +273,11 @@ void main() {
   test('describes form uploads without keeping the file', () async {
     final dio = dioWith((_) => json('{}', 201));
 
-    await dio.post<dynamic>('/upload', data: FormData.fromMap({
-      'note': 'receipt',
-      'file': MultipartFile.fromBytes([1, 2, 3], filename: 'a.png'),
-    }));
+    await dio.post<dynamic>('/upload',
+        data: FormData.fromMap({
+          'note': 'receipt',
+          'file': MultipartFile.fromBytes([1, 2, 3], filename: 'a.png'),
+        }));
 
     expect(AppInspect.store.calls.single.requestBody, {
       'fields': {'note': 'receipt'},

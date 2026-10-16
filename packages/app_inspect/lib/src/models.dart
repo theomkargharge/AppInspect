@@ -1,7 +1,6 @@
 /// One stay on a screen. Every call is tagged with the visit that made it.
 class AppInspectVisit {
-  AppInspectVisit({required this.id, required String name, required this.startedAt})
-      : _name = name;
+  AppInspectVisit({required this.id, required String name, required this.startedAt}) : _name = name;
 
   final int id;
   final DateTime startedAt;
@@ -85,8 +84,7 @@ class AppInspectCall {
 
   /// A failure without a response, a 4xx or 5xx response, or a response the
   /// app couldn't read.
-  bool get isError =>
-      state == AppInspectCallState.failed || (statusCode ?? 0) >= 400 || parseError != null;
+  bool get isError => state == AppInspectCallState.failed || (statusCode ?? 0) >= 400 || parseError != null;
 
   bool isSlow(Duration threshold) {
     final d = duration;

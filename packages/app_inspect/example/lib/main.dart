@@ -209,9 +209,8 @@ class _ProductScreenState extends State<ProductScreen> {
     setState(() => _product = res.data);
 
     // Slow on purpose: AppInspect flags it as slow.
-    dio
-        .get<Map<String, dynamic>>('/products/${widget.id}', queryParameters: {'select': 'reviews', 'delay': 1500})
-        .then((r) {
+    dio.get<Map<String, dynamic>>('/products/${widget.id}', queryParameters: {'select': 'reviews', 'delay': 1500}).then(
+        (r) {
       if (mounted) setState(() => _reviewCount = (r.data!['reviews'] as List).length);
     }).ignore();
 

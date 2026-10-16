@@ -85,7 +85,11 @@ void main() {
   test('sizes decoded JSON only when asked, as an estimate', () async {
     final body = {
       'products': [
-        {'title': 'Crème brûlée lip balm', 'price': 9.99, 'tags': ['beauty']},
+        {
+          'title': 'Crème brûlée lip balm',
+          'price': 9.99,
+          'tags': ['beauty']
+        },
       ],
       'total': 1,
     };

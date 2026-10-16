@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransition, CupertinoRouteTransitionMixin;
 import 'package:flutter/material.dart';
 
 /// Colors, shadows and code colors for the inspector, in its light and dark
@@ -148,7 +149,11 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
 
   /// A deeper shadow for things that float, such as the bubble and toasts.
   List<BoxShadow> get floatShadow => [
-        BoxShadow(color: shadow.withValues(alpha: shadow.a * 2.2), blurRadius: 28, offset: const Offset(0, 12), spreadRadius: -6),
+        BoxShadow(
+            color: shadow.withValues(alpha: shadow.a * 2.2),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+            spreadRadius: -6),
         BoxShadow(color: shadow, blurRadius: 6, offset: const Offset(0, 2)),
       ];
 
@@ -279,10 +284,34 @@ ThemeData buildAppInspectTheme({required bool dark}) {
     progressIndicatorTheme: ProgressIndicatorThemeData(color: t.accent),
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
-        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.android: _SlidePageTransitionsBuilder(),
+        TargetPlatform.iOS: _SlidePageTransitionsBuilder(),
+        TargetPlatform.macOS: _SlidePageTransitionsBuilder(),
       },
     ),
   );
+}
+
+/// The iOS slide transition. `CupertinoPageTransitionsBuilder` moved from
+/// `material.dart` to `cupertino.dart` in newer Flutter releases, so this
+/// rebuilds it from the parts both old and new releases export.
+class _SlidePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _SlidePageTransitionsBuilder();
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 500);
+
+  @override
+  DelegatedTransitionBuilder? get delegatedTransition => CupertinoPageTransition.delegatedTransition;
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return CupertinoRouteTransitionMixin.buildPageTransitions<T>(route, context, animation, secondaryAnimation, child);
+  }
 }

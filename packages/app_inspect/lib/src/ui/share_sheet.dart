@@ -51,7 +51,9 @@ Future<void> showCallActions(BuildContext context, AppInspectCall call) {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(call.path,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: appInspectMono.copyWith(color: t.textSecondary)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: appInspectMono.copyWith(color: t.textSecondary)),
                       ),
                     ],
                   ),

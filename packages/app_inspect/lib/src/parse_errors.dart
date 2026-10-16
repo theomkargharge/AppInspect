@@ -108,7 +108,8 @@ AppInspectParseError buildParseError(Object error, StackTrace stack, {String? fi
     break;
   }
 
-  final likely = field == null && got != null ? _likelyFields(decodeBody(responseBody), got, expected) : const <String>[];
+  final likely =
+      field == null && got != null ? _likelyFields(decodeBody(responseBody), got, expected) : const <String>[];
   return AppInspectParseError(
     message: message,
     field: field,

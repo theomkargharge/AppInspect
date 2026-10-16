@@ -268,7 +268,10 @@ class _JsonSliverState extends State<JsonSliver> {
           null => ('null', t.jsonLiteral),
           bool b => ('$b', t.jsonLiteral),
           num n => ('$n', t.jsonNumber),
-          String s => ('"${s.length > 300 ? '${s.substring(0, 300)}…' : s}"', s == appInspectMask ? t.textMuted : t.jsonString),
+          String s => (
+              '"${s.length > 300 ? '${s.substring(0, 300)}…' : s}"',
+              s == appInspectMask ? t.textMuted : t.jsonString
+            ),
           _ => (v.toString(), t.textMuted),
         };
         final failed = widget.highlight.contains(line.path);

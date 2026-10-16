@@ -211,8 +211,7 @@ class AppInspectStore extends ChangeNotifier {
   }
 
   /// Calls made during [visit], oldest first.
-  List<AppInspectCall> callsFor(AppInspectVisit visit) =>
-      _calls.where((c) => identical(c.visit, visit)).toList();
+  List<AppInspectCall> callsFor(AppInspectVisit visit) => _calls.where((c) => identical(c.visit, visit)).toList();
 
   void markErrorsSeen() => unseenErrors.value = 0;
 

@@ -1,3 +1,9 @@
+## 0.2.1
+
+* Fixed: the package didn't compile with Flutter 3.47, where `CupertinoPageTransitionsBuilder` moved out of `material.dart`.
+* Screenshots on the pub.dev page.
+* Formatted the code with `dart format`, at 120 columns.
+
 ## 0.2.0
 
 * Renamed from NetLens to AppInspect: the packages are app_inspect, app_inspect_dio and app_inspect_http, the classes start with AppInspect (such as AppInspectConfig), and the build flag is `--dart-define=APP_INSPECT=true`.

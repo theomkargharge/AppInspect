@@ -17,8 +17,7 @@ class AppInspectMasker {
   final AppInspectConfig config;
   final bool enabled;
 
-  bool isMaskedHeader(String name) =>
-      enabled && config.maskedHeaders.contains(name.toLowerCase());
+  bool isMaskedHeader(String name) => enabled && config.maskedHeaders.contains(name.toLowerCase());
 
   bool isMaskedKey(String key) => enabled && config.maskedBodyKeys.contains(key.toLowerCase());
 
@@ -123,9 +122,7 @@ class _ByteCounter extends ByteConversionSink {
 String encodeBody(Object? decoded, {bool pretty = true}) {
   if (decoded == null) return '';
   if (decoded is String) return decoded;
-  final encoder = pretty
-      ? JsonEncoder.withIndent('  ', (o) => o.toString())
-      : JsonEncoder((o) => o.toString());
+  final encoder = pretty ? JsonEncoder.withIndent('  ', (o) => o.toString()) : JsonEncoder((o) => o.toString());
   return encoder.convert(decoded);
 }
 
@@ -217,10 +214,10 @@ List<AppInspectInsight> insightsFor(AppInspectCall call, {required Duration slow
           'The app stopped waiting after ${formatDuration(call.duration)}.'),
       'No connection' => const AppInspectInsight(AppInspectInsightLevel.error, 'Couldn\'t reach the server',
           'Check the internet connection and the base URL. Nothing reached the backend.'),
-      'Cancelled' => const AppInspectInsight(AppInspectInsightLevel.info, 'Cancelled by the app',
-          'The app cancelled this request before it finished.'),
-      _ => AppInspectInsight(AppInspectInsightLevel.error, 'Request failed',
-          call.errorDetail ?? call.error ?? 'No details.'),
+      'Cancelled' => const AppInspectInsight(
+          AppInspectInsightLevel.info, 'Cancelled by the app', 'The app cancelled this request before it finished.'),
+      _ => AppInspectInsight(
+          AppInspectInsightLevel.error, 'Request failed', call.errorDetail ?? call.error ?? 'No details.'),
     });
   } else if (code >= 500) {
     out.add(const AppInspectInsight(AppInspectInsightLevel.error, 'Server error',

@@ -197,8 +197,7 @@ abstract final class AppInspectDio {
   /// ```
   ///
   /// In builds without AppInspect it just calls [fromJson].
-  static T parse<T>(Response<dynamic> response, T Function(Map<String, dynamic> json) fromJson) =>
-      AppInspect.parse(
+  static T parse<T>(Response<dynamic> response, T Function(Map<String, dynamic> json) fromJson) => AppInspect.parse(
         response.data,
         fromJson,
         call: callFor(response.requestOptions),

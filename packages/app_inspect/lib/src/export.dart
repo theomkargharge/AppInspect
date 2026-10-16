@@ -77,7 +77,7 @@ String buildHar(List<AppInspectCall> calls, AppInspectMasker masker) {
   return _pretty.convert({
     'log': {
       'version': '1.2',
-      'creator': {'name': 'AppInspect', 'version': '0.2.0'},
+      'creator': {'name': 'AppInspect', 'version': '0.2.1'},
       'entries': entries,
     },
   });

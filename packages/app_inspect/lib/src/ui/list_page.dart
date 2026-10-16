@@ -205,7 +205,9 @@ class _Header extends StatelessWidget {
             decoration: BoxDecoration(
               color: t.accent,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: t.accent.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
+              boxShadow: [
+                BoxShadow(color: t.accent.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))
+              ],
             ),
             child: Icon(Icons.manage_search_rounded, color: t.onAccent, size: 22),
           ),
@@ -214,7 +216,8 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Network', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.7, color: t.text)),
+                Text('Network',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.7, color: t.text)),
                 Row(
                   children: [
                     Icon(Icons.layers_rounded, size: 13, color: t.textMuted),
@@ -321,7 +324,8 @@ class _CallCard extends StatelessWidget {
                               call.path,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: appInspectMono.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: t.text),
+                              style:
+                                  appInspectMono.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: t.text),
                             ),
                           ),
                         ],
@@ -334,8 +338,7 @@ class _CallCard extends StatelessWidget {
                         children: [
                           NlStatusPill(call),
                           _Meta(Icons.schedule_rounded, formatDuration(call.duration)),
-                          if (call.responseSize != null)
-                            _Meta(Icons.download_rounded, formatResponseSize(call)),
+                          if (call.responseSize != null) _Meta(Icons.download_rounded, formatResponseSize(call)),
                           ...flagPills(context, call),
                         ],
                       ),

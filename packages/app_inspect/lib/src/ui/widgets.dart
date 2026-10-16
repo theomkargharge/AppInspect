@@ -62,7 +62,8 @@ class NlStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppInspectTokens.of(context);
     if (call.isPending) {
-      return NlPill(label: 'Pending', foreground: t.textSecondary, background: t.surfaceAlt, icon: Icons.more_horiz_rounded);
+      return NlPill(
+          label: 'Pending', foreground: t.textSecondary, background: t.surfaceAlt, icon: Icons.more_horiz_rounded);
     }
     final failed = call.state == AppInspectCallState.failed || (call.statusCode ?? 0) >= 400;
     return NlPill(
@@ -83,7 +84,11 @@ List<Widget> flagPills(BuildContext context, AppInspectCall call) {
     if (call.isSlow(AppInspect.slowThreshold.value))
       NlPill(label: 'Slow', foreground: t.warn, background: t.warnSoft, icon: Icons.schedule_rounded),
     if (call.isRepeated)
-      NlPill(label: 'Repeated ${call.repeatCount}×', foreground: t.violet, background: t.violetSoft, icon: Icons.repeat_rounded),
+      NlPill(
+          label: 'Repeated ${call.repeatCount}×',
+          foreground: t.violet,
+          background: t.violetSoft,
+          icon: Icons.repeat_rounded),
   ];
 }
 
@@ -157,7 +162,8 @@ class KeyValueCard extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 118,
-                    child: Text(label, style: TextStyle(fontSize: 13, color: t.textSecondary, fontWeight: FontWeight.w500)),
+                    child: Text(label,
+                        style: TextStyle(fontSize: 13, color: t.textSecondary, fontWeight: FontWeight.w500)),
                   ),
                   Expanded(child: SelectableText(value, style: appInspectMono.copyWith(fontSize: 12.5, color: t.text))),
                   if (trailing[label] case final Widget extra) extra,

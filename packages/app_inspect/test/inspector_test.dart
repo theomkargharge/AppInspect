@@ -147,8 +147,8 @@ void main() {
     await tester.pumpWidget(app(const HomeScreen()));
     await tester.pumpAndSettle();
     tester.state<NavigatorState>(find.byType(Navigator)).push(
-      MaterialPageRoute<void>(builder: (_) => const DetailsScreen()),
-    );
+          MaterialPageRoute<void>(builder: (_) => const DetailsScreen()),
+        );
     await tester.pumpAndSettle();
 
     AppInspect.open();

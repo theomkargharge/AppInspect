@@ -236,7 +236,8 @@ class _InspectorTabsState extends State<_InspectorTabs> {
             onChanged: (i) => setState(() => _tab = i),
             items: [
               const NlNavItem(icon: Icons.sync_alt_rounded, label: 'Network', key: ValueKey('app_inspect_tab_network')),
-              NlNavItem(icon: Icons.notes_rounded, label: 'Logs', badge: errors, key: const ValueKey('app_inspect_tab_logs')),
+              NlNavItem(
+                  icon: Icons.notes_rounded, label: 'Logs', badge: errors, key: const ValueKey('app_inspect_tab_logs')),
             ],
           ),
         );
@@ -298,7 +299,8 @@ class _PinGateState extends State<_PinGate> with SingleTickerProviderStateMixin 
               alignment: Alignment.centerRight,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: NlIconButton(icon: Icons.close_rounded, tooltip: 'Close AppInspect', onPressed: AppInspect.close),
+                child:
+                    NlIconButton(icon: Icons.close_rounded, tooltip: 'Close AppInspect', onPressed: AppInspect.close),
               ),
             ),
             Expanded(
@@ -322,7 +324,8 @@ class _PinGateState extends State<_PinGate> with SingleTickerProviderStateMixin 
                         Text(
                           'Enter the AppInspect PIN',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: t.text),
+                          style:
+                              TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: t.text),
                         ),
                         const SizedBox(height: 8),
                         Text(

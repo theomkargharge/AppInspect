@@ -13,7 +13,8 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([AppInspect.store, AppInspect.maskData, AppInspect.darkTheme, AppInspect.slowThreshold]),
+      listenable:
+          Listenable.merge([AppInspect.store, AppInspect.maskData, AppInspect.darkTheme, AppInspect.slowThreshold]),
       builder: (context, _) {
         final t = AppInspectTokens.of(context);
         final config = AppInspect.config;
@@ -41,7 +42,9 @@ class SettingsPage extends StatelessWidget {
                       onPressed: () => Navigator.of(context).maybePop(),
                     ),
                     const SizedBox(width: 12),
-                    Text('Settings', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: t.text)),
+                    Text('Settings',
+                        style:
+                            TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.5, color: t.text)),
                   ],
                 ),
                 const NlSectionLabel('Privacy'),
@@ -78,7 +81,8 @@ class SettingsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text('Calls slower than this are flagged.', style: TextStyle(fontSize: 13, color: t.textSecondary)),
+                      Text('Calls slower than this are flagged.',
+                          style: TextStyle(fontSize: 13, color: t.textSecondary)),
                       const SizedBox(height: 12),
                       NlSegmented<Duration>(
                         value: limit,
@@ -93,12 +97,18 @@ class SettingsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _Meter(label: 'Calls', used: AppInspect.store.calls.length, max: config.maxCalls, color: t.accent),
+                      _Meter(
+                          label: 'Calls', used: AppInspect.store.calls.length, max: config.maxCalls, color: t.accent),
                       const SizedBox(height: 14),
-                      _Meter(label: 'Log entries', used: AppInspect.store.logs.length, max: config.maxLogs, color: t.violet),
+                      _Meter(
+                          label: 'Log entries',
+                          used: AppInspect.store.logs.length,
+                          max: config.maxLogs,
+                          color: t.violet),
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(foregroundColor: t.err, side: BorderSide(color: t.err.withValues(alpha: 0.4))),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: t.err, side: BorderSide(color: t.err.withValues(alpha: 0.4))),
                         onPressed: () {
                           AppInspect.store
                             ..clear()
@@ -114,7 +124,7 @@ class SettingsPage extends StatelessWidget {
                 const NlSectionLabel('About'),
                 NlCard(
                   child: Text(
-                    'AppInspect 0.2.0. On in debug builds, and in other builds only with '
+                    'AppInspect 0.2.1. On in debug builds, and in other builds only with '
                     '--dart-define=APP_INSPECT=true. Production builds don\'t contain it.',
                     style: TextStyle(fontSize: 13, height: 1.5, color: t.textSecondary),
                   ),

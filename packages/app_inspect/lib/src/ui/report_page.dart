@@ -152,9 +152,11 @@ class _ReportPageState extends State<ReportPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('SCREEN',
-                            style: TextStyle(fontSize: 11, letterSpacing: 0.9, fontWeight: FontWeight.w700, color: t.textMuted)),
+                            style: TextStyle(
+                                fontSize: 11, letterSpacing: 0.9, fontWeight: FontWeight.w700, color: t.textMuted)),
                         const SizedBox(height: 2),
-                        Text(_screen.name, style: appInspectMono.copyWith(fontSize: 15, fontWeight: FontWeight.w700, color: t.text)),
+                        Text(_screen.name,
+                            style: appInspectMono.copyWith(fontSize: 15, fontWeight: FontWeight.w700, color: t.text)),
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 6,
@@ -167,7 +169,11 @@ class _ReportPageState extends State<ReportPage> {
                               icon: Icons.sync_alt_rounded,
                             ),
                             if (failed > 0)
-                              NlPill(label: '$failed failed', foreground: t.err, background: t.errSoft, icon: Icons.error_rounded),
+                              NlPill(
+                                  label: '$failed failed',
+                                  foreground: t.err,
+                                  background: t.errSoft,
+                                  icon: Icons.error_rounded),
                             if (problems > 0)
                               NlPill(
                                 label: '$problems in logs',
@@ -378,7 +384,8 @@ class _Thumbnail extends StatelessWidget {
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(8),
-                      child: Text('No screenshot', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: t.textMuted)),
+                      child: Text('No screenshot',
+                          textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: t.textMuted)),
                     ),
                   )
                 : Hero(

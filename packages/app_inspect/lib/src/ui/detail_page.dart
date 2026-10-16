@@ -98,7 +98,8 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const NlIconButton(icon: Icons.close_rounded, tooltip: 'Close AppInspect', onPressed: AppInspect.close),
+                      const NlIconButton(
+                          icon: Icons.close_rounded, tooltip: 'Close AppInspect', onPressed: AppInspect.close),
                     ],
                   ),
                 ),
@@ -244,7 +245,8 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
       if (masked) {
         trailing[e.key] = NlPressable(
           onTap: () => setState(() => _revealed.add(e.key)),
-          child: NlPill(label: 'Reveal', foreground: t.accent, background: t.accentSoft, icon: Icons.visibility_rounded),
+          child:
+              NlPill(label: 'Reveal', foreground: t.accent, background: t.accentSoft, icon: Icons.visibility_rounded),
         );
       }
     }
@@ -254,7 +256,8 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
   Widget _requestTab(AppInspectMasker masker) {
     final query = call.uri.queryParametersAll;
     return _tab([
-      const SliverToBoxAdapter(child: NlSectionLabel('Headers, after every interceptor', padding: EdgeInsets.fromLTRB(4, 8, 4, 8))),
+      const SliverToBoxAdapter(
+          child: NlSectionLabel('Headers, after every interceptor', padding: EdgeInsets.fromLTRB(4, 8, 4, 8))),
       SliverToBoxAdapter(child: _headers(call.requestHeaders, masker)),
       if (query.isNotEmpty) ...[
         const SliverToBoxAdapter(child: NlSectionLabel('Query parameters')),
@@ -276,7 +279,8 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
     // The body is what QC needs, so it comes first. Response headers are
     // often long, so they start folded.
     return _tab([
-      const SliverToBoxAdapter(child: NlSectionLabel('Raw body, before the app parses it', padding: EdgeInsets.fromLTRB(4, 8, 4, 8))),
+      const SliverToBoxAdapter(
+          child: NlSectionLabel('Raw body, before the app parses it', padding: EdgeInsets.fromLTRB(4, 8, 4, 8))),
       _BodySliver(body: call.responseBody, masker: masker, highlight: {...?call.parseError?.highlightPaths}),
       SliverToBoxAdapter(
         child: Padding(
@@ -408,7 +412,8 @@ class _TimingBar extends StatelessWidget {
       return Text('Waiting for the response…', style: TextStyle(fontSize: 12.5, color: t.textSecondary));
     }
     final limit = AppInspect.slowThreshold.value;
-    final scaleMs = [limit.inMilliseconds * 2, (duration.inMilliseconds * 1.15).round()].reduce((a, b) => a > b ? a : b);
+    final scaleMs =
+        [limit.inMilliseconds * 2, (duration.inMilliseconds * 1.15).round()].reduce((a, b) => a > b ? a : b);
     final fraction = (duration.inMilliseconds / scaleMs).clamp(0.02, 1.0);
     final limitAt = limit.inMilliseconds / scaleMs;
     final slow = call.isSlow(limit);
@@ -438,7 +443,8 @@ class _TimingBar extends StatelessWidget {
                   left: constraints.maxWidth * limitAt - 1,
                   top: -3,
                   bottom: -3,
-                  child: Container(width: 2, decoration: BoxDecoration(color: t.textMuted, borderRadius: BorderRadius.circular(1))),
+                  child: Container(
+                      width: 2, decoration: BoxDecoration(color: t.textMuted, borderRadius: BorderRadius.circular(1))),
                 ),
               ],
             ),
@@ -537,7 +543,9 @@ class _FoldableState extends State<_Foldable> {
           duration: const Duration(milliseconds: 260),
           curve: Curves.easeOutCubic,
           alignment: Alignment.topCenter,
-          child: _open ? Padding(padding: const EdgeInsets.only(top: 8), child: widget.child) : const SizedBox(width: double.infinity),
+          child: _open
+              ? Padding(padding: const EdgeInsets.only(top: 8), child: widget.child)
+              : const SizedBox(width: double.infinity),
         ),
       ],
     );

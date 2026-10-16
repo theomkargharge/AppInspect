@@ -14,8 +14,6 @@ String get operatingSystemDescription {
     final other => other,
   };
   // iOS reports "Version 26.2 (Build 23C54)".
-  final version = Platform.operatingSystemVersion
-      .replaceFirst(RegExp(r'^Version '), '')
-      .replaceFirst('(Build ', '(');
+  final version = Platform.operatingSystemVersion.replaceFirst(RegExp(r'^Version '), '').replaceFirst('(Build ', '(');
   return '$name $version';
 }
