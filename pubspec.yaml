@@ -1,11 +1,11 @@
-name: net_lens_workspace
+name: app_inspect_workspace
 publish_to: none
 
 environment:
   sdk: ^3.6.0
 
 workspace:
-  - packages/net_lens
-  - packages/net_lens/example
-  - packages/net_lens_dio
-  - packages/net_lens_http
+  - packages/app_inspect
+  - packages/app_inspect/example
+  - packages/app_inspect_dio
+  - packages/app_inspect_http
