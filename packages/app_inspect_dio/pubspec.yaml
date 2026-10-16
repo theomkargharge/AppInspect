@@ -1,6 +1,6 @@
 name: app_inspect_dio
 description: Captures Dio requests for the AppInspect in-app network inspector.
-version: 0.2.0
+version: 0.2.1
 repository: https://github.com/theomkargharge/NetLense/tree/main/packages/app_inspect_dio
 issue_tracker: https://github.com/theomkargharge/NetLense/issues
 topics:

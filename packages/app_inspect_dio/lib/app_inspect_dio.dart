@@ -21,6 +21,7 @@ import 'package:app_inspect/app_inspect.dart';
 /// It never changes or blocks a request. When AppInspect is off (production
 /// builds), every method just passes the call on.
 class AppInspectDioInterceptor extends Interceptor {
+  /// Creates an interceptor that records the calls of the Dio it's added to.
   AppInspectDioInterceptor();
 
   static const String _callKey = 'app_inspect_call';

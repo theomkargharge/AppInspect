@@ -20,6 +20,8 @@ import 'package:app_inspect/app_inspect.dart';
 /// When AppInspect is off (production builds), calls go straight to the inner
 /// client.
 class AppInspectHttpClient extends http.BaseClient {
+  /// Wraps [inner], or a new `http.Client()` when it's null. Closing this
+  /// client closes [inner].
   AppInspectHttpClient([http.Client? inner]) : _inner = inner ?? http.Client();
 
   final http.Client _inner;

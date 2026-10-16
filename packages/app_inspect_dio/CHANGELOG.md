@@ -1,3 +1,8 @@
+## 0.2.1
+
+* Added an example.
+* Documented the AppInspectDioInterceptor constructor.
+
 ## 0.2.0
 
 * Renamed from net_lens_dio. The interceptor is now AppInspectDioInterceptor.
