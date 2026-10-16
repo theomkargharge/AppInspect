@@ -1,0 +1,375 @@
+import 'dart:async' as zones;
+import 'dart:collection';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+
+import 'config.dart';
+import 'models.dart';
+import 'parse_errors.dart';
+import 'platform/platform_info.dart';
+import 'screens.dart';
+import 'store.dart';
+import 'ui/overlay.dart';
+
+/// The navigator for the inspector's own pages. Never the app's navigator.
+final GlobalKey<NavigatorState> netLensNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'NetLens');
+
+/// The app without NetLens on top. Bug-report screenshots are taken from it.
+final GlobalKey netLensAppKey = GlobalKey(debugLabel: 'NetLensApp');
+
+/// Set when the inspector should open straight on the bug report.
+bool netLensReportPending = false;
+
+/// Entry point for NetLens, the QC-first network inspector.
+///
+/// ```dart
+/// void main() => runApp(NetLens.wrap(const MyApp()));
+///
+/// MaterialApp(navigatorObservers: [NetLens.navigatorObserver]);
+/// dio.interceptors.add(NetLensDioInterceptor()); // package:net_lens_dio
+/// ```
+///
+/// NetLens is on in debug builds. In profile and release builds it is on only
+/// with `--dart-define=NET_LENS=true`, so a production build doesn't contain
+/// it at all: [isEnabled] is a compile-time constant and the compiler removes
+/// every code path behind it.
+abstract final class NetLens {
+  /// Whether NetLens is compiled into this build.
+  static const bool isEnabled = bool.fromEnvironment('NET_LENS', defaultValue: kDebugMode);
+
+  /// Captured calls, logs and screen visits. Adapters write to it.
+  static final NetLensStore store = NetLensStore();
+
+  static final NetLensNavigatorObserver _observer = NetLensNavigatorObserver(store);
+
+  /// Whether the inspector is showing.
+  static final ValueNotifier<bool> isOpen = ValueNotifier<bool>(false);
+
+  /// Mask sensitive headers and keys. People can turn this off in Settings.
+  static final ValueNotifier<bool> maskData = ValueNotifier<bool>(true);
+
+  /// The inspector's own theme, separate from the app's.
+  static final ValueNotifier<bool> darkTheme = ValueNotifier<bool>(false);
+
+  /// Calls slower than this are flagged. People can change it in Settings.
+  static final ValueNotifier<Duration> slowThreshold =
+      ValueNotifier<Duration>(const Duration(seconds: 1));
+
+  static bool _unlocked = false;
+  static bool _backHandlerInstalled = false;
+  static _LogHooks? _hooks;
+  static bool _inFlutterError = false;
+
+  /// Lines debugPrint is about to print. debugPrint prints through `print`,
+  /// so the zone skips these instead of logging them twice.
+  static final ListQueue<String> _debugPrinted = ListQueue<String>();
+
+  static void _rememberPrinted(String message) {
+    for (final line in message.split('\n')) {
+      _debugPrinted.addLast(line);
+      if (_debugPrinted.length > 200) _debugPrinted.removeFirst();
+    }
+  }
+
+  static NetLensConfig get config => store.config;
+
+  /// Wraps the app with the floating bubble and the inspector.
+  ///
+  /// Call it where you call `runApp`, so NetLens can handle the back button
+  /// before the app does while the inspector is open.
+  static Widget wrap(Widget app, {NetLensConfig config = const NetLensConfig()}) {
+    if (!isEnabled) return app;
+    store.config = config;
+    darkTheme.value = config.darkTheme;
+    slowThreshold.value = config.slowThreshold;
+    _installBackHandler();
+    // flutter test checks that debugPrint and the error handlers are left
+    // alone, so NetLens doesn't hook them there.
+    if (config.captureLogs && !isFlutterTest) _installLogHooks();
+    return NetLensOverlay(child: app);
+  }
+
+  /// Runs [body], usually your `runApp` call, in a zone that also sends
+  /// `print` output to the logs console.
+  ///
+  /// Call it first thing in `main`, before `WidgetsFlutterBinding.ensureInitialized`,
+  /// so the binding and the app share the zone:
+  ///
+  /// ```dart
+  /// void main() => NetLens.runZoned(() => runApp(NetLens.wrap(const MyApp())));
+  /// ```
+  static R runZoned<R>(R Function() body) {
+    if (!isEnabled) return body();
+    return zones.runZoned(
+      body,
+      zoneSpecification: zones.ZoneSpecification(
+        print: (self, parent, zone, line) {
+          if (!_debugPrinted.remove(line)) store.addLog(NetLensLogLevel.info, line, source: 'print');
+          parent.print(zone, line);
+        },
+      ),
+    );
+  }
+
+  /// Add this to `MaterialApp.navigatorObservers` (or your router's
+  /// observers) so every call is tagged with the screen that made it.
+  static NavigatorObserver get navigatorObserver => isEnabled ? _observer : NavigatorObserver();
+
+  /// Names the current screen when there's no route change, such as a tab
+  /// switch. The `NetLensScreen` widget calls this for you.
+  static void markScreen(String name) {
+    if (isEnabled) _observer.tagScreen(name);
+  }
+
+  /// Adds a line to the logs console, tagged with the current screen.
+  static void log(
+    String message, {
+    NetLensLogLevel level = NetLensLogLevel.info,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    if (!isEnabled) return;
+    store.addLog(level, error == null ? message : '$message: $error',
+        source: 'App', details: stackTrace?.toString());
+  }
+
+  /// Parses [json] with [fromJson]. If it throws, NetLens links the error to
+  /// the response it came from, names the exact field that broke, and
+  /// rethrows.
+  ///
+  /// Pass the [call], or the request's [uri] so NetLens can find it.
+  /// `NetLensDio.parse` does this for Dio responses.
+  static T parse<T>(
+    Object? json,
+    T Function(Map<String, dynamic> json) fromJson, {
+    NetLensCall? call,
+    Uri? uri,
+  }) {
+    if (!isEnabled) return fromJson(json as Map<String, dynamic>);
+    final tracker = JsonReadTracker();
+    try {
+      return fromJson(trackJson(json, '', tracker) as Map<String, dynamic>);
+    } catch (error, stack) {
+      reportParseError(error, stack, call: call, uri: uri, field: tracker.lastPath);
+      rethrow;
+    }
+  }
+
+  /// Like [parse], for a JSON list of objects.
+  static List<T> parseList<T>(
+    Object? json,
+    T Function(Map<String, dynamic> json) fromJson, {
+    NetLensCall? call,
+    Uri? uri,
+  }) {
+    if (!isEnabled) return [for (final e in json as List<dynamic>) fromJson(e as Map<String, dynamic>)];
+    final tracker = JsonReadTracker();
+    try {
+      final list = trackJson(json, '', tracker) as List<dynamic>;
+      return [for (final e in list) fromJson(e as Map<String, dynamic>)];
+    } catch (error, stack) {
+      reportParseError(error, stack, call: call, uri: uri, field: tracker.lastPath);
+      rethrow;
+    }
+  }
+
+  /// Links a parsing failure to the response it came from. Use it when you
+  /// parse responses yourself, for example from Retrofit's
+  /// `ParseErrorLogger`. Without [field], NetLens guesses the likely fields.
+  static void reportParseError(
+    Object error,
+    StackTrace stack, {
+    NetLensCall? call,
+    Uri? uri,
+    String? field,
+  }) {
+    if (!isEnabled) return;
+    try {
+      var target = call;
+      if (target == null && uri != null) {
+        final calls = store.calls;
+        for (var i = calls.length - 1; i >= 0; i--) {
+          if (calls[i].uri == uri && !calls[i].isPending) {
+            target = calls[i];
+            break;
+          }
+        }
+      }
+      final parsed = buildParseError(error, stack, field: field, responseBody: target?.responseBody);
+      if (target != null) {
+        store.attachParseError(target, parsed);
+      } else {
+        store.addLog(NetLensLogLevel.error, 'Couldn\'t read a response: ${parsed.message}',
+            source: 'Parse error', details: parsed.stack);
+      }
+    } catch (_) {
+      // Reporting must never break the app.
+    }
+  }
+
+  /// Opens the inspector on the current screen's calls.
+  static void open() {
+    if (!isEnabled) return;
+    store.markErrorsSeen();
+    isOpen.value = true;
+  }
+
+  /// Opens the bug report for the current screen. Holding the bubble does this.
+  static void openReport() {
+    if (!isEnabled) return;
+    netLensReportPending = true;
+    if (isOpen.value) {
+      // The open inspector picks it up on its next frame.
+      store.refresh();
+    } else {
+      open();
+    }
+  }
+
+  static void close() {
+    if (!isEnabled) return;
+    isOpen.value = false;
+  }
+
+  /// False until the right PIN is entered, when `NetLensConfig.pin` is set.
+  static bool get isUnlocked => _unlocked || config.pin == null;
+
+  /// Returns whether [pin] was right. A right PIN unlocks until the app restarts.
+  static bool unlock(String pin) {
+    if (pin == config.pin) _unlocked = true;
+    return isUnlocked;
+  }
+
+  /// A PNG of the app as it is now, without the bubble or the inspector.
+  static Future<Uint8List?> captureScreenshot() async {
+    if (!isEnabled) return null;
+    final context = netLensAppKey.currentContext;
+    final boundary = context?.findRenderObject();
+    if (context == null || boundary is! RenderRepaintBoundary) return null;
+    try {
+      final ratio = math.min(View.maybeOf(context)?.devicePixelRatio ?? 2.0, 2.0);
+      final image = await boundary.toImage(pixelRatio: ratio);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      return bytes?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Hooks `debugPrint`, Flutter errors and uncaught errors, for tests.
+  @visibleForTesting
+  static void debugInstallLogHooks() => _installLogHooks();
+
+  /// Undoes [debugInstallLogHooks].
+  @visibleForTesting
+  static void debugRemoveLogHooks() {
+    final hooks = _hooks;
+    if (hooks == null) return;
+    debugPrint = hooks.debugPrint;
+    FlutterError.onError = hooks.flutterError;
+    ui.PlatformDispatcher.instance.onError = hooks.platformError;
+    _hooks = null;
+  }
+
+  static void _installLogHooks() {
+    if (_hooks != null) return;
+    final dispatcher = ui.PlatformDispatcher.instance;
+    final hooks = _LogHooks(debugPrint, FlutterError.onError, dispatcher.onError);
+    _hooks = hooks;
+
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) {
+        // Flutter prints each error through debugPrint too. That error is
+        // already logged once, so skip the copy.
+        if (!_inFlutterError) store.addLog(NetLensLogLevel.info, message, source: 'debugPrint');
+        _rememberPrinted(message);
+      }
+      hooks.debugPrint(message, wrapWidth: wrapWidth);
+    };
+
+    FlutterError.onError = (details) {
+      _inFlutterError = true;
+      try {
+        store.addLog(NetLensLogLevel.error, details.exceptionAsString(),
+            source: 'Flutter error', details: details.stack?.toString());
+        hooks.flutterError?.call(details);
+      } finally {
+        _inFlutterError = false;
+      }
+    };
+
+    dispatcher.onError = (error, stack) {
+      store.addLog(NetLensLogLevel.error, '$error', source: 'Uncaught error', details: stack.toString());
+      return hooks.platformError?.call(error, stack) ?? false;
+    };
+  }
+
+  static void _installBackHandler() {
+    if (_backHandlerInstalled) return;
+    _backHandlerInstalled = true;
+    WidgetsFlutterBinding.ensureInitialized().addObserver(_BackHandler());
+  }
+
+  /// Back goes to the inspector first: it pops an inspector page, or closes
+  /// the inspector, and the app's own screens stay where they are.
+  static bool _handleBack() {
+    if (!isOpen.value) return false;
+    final nav = netLensNavigatorKey.currentState;
+    if (nav != null && nav.canPop()) {
+      nav.pop();
+    } else {
+      close();
+    }
+    return true;
+  }
+}
+
+/// Device and app details for bug reports.
+Map<String, String> netLensReportInfo() {
+  final info = <String, String>{};
+  try {
+    final dispatcher = WidgetsBinding.instance.platformDispatcher;
+    final os = operatingSystemDescription;
+    final platform = os.isEmpty ? defaultTargetPlatform.name : os;
+    final views = dispatcher.views;
+    if (views.isNotEmpty) {
+      final view = views.first;
+      final size = view.physicalSize / view.devicePixelRatio;
+      info['Device'] = '$platform · ${size.width.round()}×${size.height.round()} '
+          '@${view.devicePixelRatio.toStringAsFixed(view.devicePixelRatio % 1 == 0 ? 0 : 1)}x';
+    } else {
+      info['Device'] = platform;
+    }
+    info['Locale'] = dispatcher.locale.toLanguageTag();
+    info.addAll(NetLens.config.reportInfo?.call() ?? const {});
+  } catch (_) {
+    // Whatever was gathered before the failure still helps.
+  }
+  return info;
+}
+
+class _LogHooks {
+  _LogHooks(this.debugPrint, this.flutterError, this.platformError);
+
+  final DebugPrintCallback debugPrint;
+  final FlutterExceptionHandler? flutterError;
+  final ui.ErrorCallback? platformError;
+}
+
+class _BackHandler with WidgetsBindingObserver {
+  @override
+  Future<bool> didPopRoute() => SynchronousFuture<bool>(NetLens._handleBack());
+
+  @override
+  bool handleStartBackGesture(PredictiveBackEvent backEvent) => NetLens.isOpen.value;
+
+  @override
+  void handleCommitBackGesture() => NetLens._handleBack();
+}

@@ -1,0 +1,7 @@
+.dart_tool/
+build/
+.idea/
+*.iml
+.DS_Store
+# Claude Code's local session files
+.claude/

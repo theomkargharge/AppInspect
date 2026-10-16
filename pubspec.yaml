@@ -1,0 +1,11 @@
+name: net_lens_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.6.0
+
+workspace:
+  - packages/net_lens
+  - packages/net_lens/example
+  - packages/net_lens_dio
+  - packages/net_lens_http
