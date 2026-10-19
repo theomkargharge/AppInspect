@@ -205,6 +205,14 @@ ThemeData buildAppInspectTheme({required bool dark}) {
   );
   final base = ThemeData(colorScheme: scheme, useMaterial3: true, brightness: scheme.brightness);
   final textTheme = base.textTheme.apply(bodyColor: t.text, displayColor: t.text);
+  // Button labels in the platform's font, like the rest of the inspector.
+  final buttonText = TextStyle(
+    fontFamily: textTheme.labelLarge?.fontFamily,
+    fontFamilyFallback: textTheme.labelLarge?.fontFamilyFallback,
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    letterSpacing: -0.1,
+  );
   return base.copyWith(
     scaffoldBackgroundColor: t.canvas,
     canvasColor: t.canvas,
@@ -248,7 +256,7 @@ ThemeData buildAppInspectTheme({required bool dark}) {
         backgroundColor: t.accent,
         foregroundColor: t.onAccent,
         minimumSize: const Size(0, 50),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.1),
+        textStyle: buttonText,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
@@ -258,7 +266,7 @@ ThemeData buildAppInspectTheme({required bool dark}) {
         backgroundColor: t.surface,
         minimumSize: const Size(0, 50),
         side: BorderSide(color: t.border),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: -0.1),
+        textStyle: buttonText,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),

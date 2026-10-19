@@ -59,38 +59,61 @@ class AppInspectHttpClient extends http.BaseClient {
     final kept = BytesBuilder(copy: false);
     var total = 0;
     var cut = false;
-    final stream = response.stream.transform(
-      StreamTransformer<List<int>, List<int>>.fromHandlers(
-        handleData: (chunk, sink) {
-          total += chunk.length;
-          final room = limit - kept.length;
-          if (room > 0) {
-            kept.add(chunk.length <= room ? chunk : chunk.sublist(0, room));
-          }
-          if (chunk.length > room) cut = true;
-          sink.add(chunk);
-        },
-        handleError: (error, stack, sink) {
-          _fail(call, error);
-          sink.addError(error, stack);
-        },
-        handleDone: (sink) {
-          try {
-            AppInspect.store.completeCall(
-              call,
-              statusCode: response.statusCode,
-              headers: response.headers,
-              body: _decode(kept.takeBytes(), response.headers['content-type']),
-              size: total,
-            );
-            if (cut) call.bodyTruncated = true;
-          } catch (_) {}
-          sink.close();
-        },
-      ),
-    );
+    var finished = false;
+
+    // Records the response once: when the body has all arrived, or when the
+    // app stops reading it early, which would otherwise leave the call
+    // pending forever.
+    void finish({required bool early}) {
+      if (finished) return;
+      finished = true;
+      try {
+        AppInspect.store.completeCall(
+          call,
+          statusCode: response.statusCode,
+          headers: response.headers,
+          body: _decode(kept.takeBytes(), response.headers['content-type']),
+          size: early ? response.contentLength : total,
+        );
+        if (cut || early) call.bodyTruncated = true;
+      } catch (_) {}
+    }
+
+    late final StreamSubscription<List<int>> source;
+    final controller = StreamController<List<int>>(sync: true);
+    controller
+      ..onListen = () {
+        source = response.stream.listen(
+          (chunk) {
+            total += chunk.length;
+            final room = limit - kept.length;
+            if (room > 0) {
+              kept.add(chunk.length <= room ? chunk : chunk.sublist(0, room));
+            }
+            if (chunk.length > room) cut = true;
+            controller.add(chunk);
+          },
+          onError: (Object error, StackTrace stack) {
+            if (!finished) {
+              finished = true;
+              _fail(call, error);
+            }
+            controller.addError(error, stack);
+          },
+          onDone: () {
+            finish(early: false);
+            controller.close();
+          },
+        );
+      }
+      ..onPause = (() => source.pause())
+      ..onResume = (() => source.resume())
+      ..onCancel = () {
+        finish(early: true);
+        return source.cancel();
+      };
     return http.StreamedResponse(
-      stream,
+      controller.stream,
       response.statusCode,
       contentLength: response.contentLength,
       request: response.request,

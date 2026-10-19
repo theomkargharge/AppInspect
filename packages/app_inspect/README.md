@@ -2,7 +2,7 @@
 
 A network inspector for Flutter that QC can use on their own.
 
-Tap the floating bubble and AppInspect shows the API calls of the screen you're on: the URL, status in plain words, time, size, headers and the raw response. Copy any call as cURL for the backend team, export it as HAR or Postman, or hold the bubble to send a complete bug report. No cable, no debug console, no "sit beside me".
+Tap the floating bubble and AppInspect shows the API calls of the screen you're on: the URL, status in plain words, time, size, headers and the raw response. Copy any call as cURL for the backend team, or export it as HAR or Postman. No cable, no debug console, no "sit beside me".
 
 <p>
   <img src="https://raw.githubusercontent.com/theomkargharge/NetLense/main/packages/app_inspect/screenshots/calls.webp" width="240" alt="Calls grouped by screen, with failed, slow and repeated calls flagged">
@@ -13,16 +13,15 @@ Tap the floating bubble and AppInspect shows the API calls of the screen you're 
 ## What it does
 
 - **Calls grouped by screen.** Every request is tagged with the screen that made it. The inspector opens on "This screen", with "All" one tap away.
-- **A bubble that turns red.** It counts the calls on the current screen and turns red when something fails, even when the app shows nothing.
-- **Plain-language status.** `500 Server error`, `404 Not found`, `Timeout`, `No connection`.
+- **A bubble that turns red.** Its badge counts the API calls on the current screen, and it turns red when something fails, even when the app shows nothing. A tab you come back to keeps its count.
+- **Plain-language status.** `500 Server error`, `404 Not found`, `Timeout`, `No connection`. A request the app cancels shows as `Cancelled` and isn't counted as a failure.
 - **Parse errors linked to the response.** When the server answers 200 but the app can't read it, AppInspect says so, names the field and highlights it: "The server answered 201 Created, but the app failed at total: expected int, got double. In CartResult.fromJson (cart.dart:42)."
 - **Insights.** Server errors, rejected requests, slow calls and calls repeated in a row (often an API call inside `build()`).
 - **Request and response details.** The final URL, the headers after every interceptor, the request body, and the raw response before your app parses it.
 - **JSON viewer.** Fold and unfold nodes. Tap a value to copy it or its path, such as `data.items[0].price`.
 - **Logs console.** `debugPrint`, `print`, Flutter errors, uncaught errors, failed calls and parse errors, each tagged with its screen and linked to its call.
-- **One-tap bug report.** Hold the bubble: a screenshot of the app without AppInspect on top, this screen's calls with cURL for the failures, its errors and warnings, and device info, as Markdown with a HAR file attached.
 - **Exports.** cURL, JSON, Markdown, HAR (Chrome DevTools, Charles, Proxyman) and Postman collections.
-- **Masking.** Authorization headers, cookies, passwords and tokens are masked on screen and in every export. A developer can reveal one header when needed.
+- **Masking.** Authorization headers, cookies, passwords and tokens are masked on screen and in every export, in the body and in the URL's query parameters too. A developer can reveal one header when needed.
 - **Safe for production.** On in debug builds. In profile and release builds it's on only with `--dart-define=APP_INSPECT=true`, so production builds don't contain it.
 - **PIN for UAT builds.** Lock the inspector in builds you hand to people outside the team.
 - **Easy on the eyes.** A light, touch-first inspector: tap a stat tile to filter, haptics on every tap, smooth transitions and a frosted action bar. Drag the bubble anywhere and it springs to the nearest edge. Dark theme in Settings.
@@ -31,9 +30,9 @@ Tap the floating bubble and AppInspect shows the API calls of the screen you're 
 
 ```yaml
 dependencies:
-  app_inspect: ^0.2.0
-  app_inspect_dio: ^0.2.0   # if you use Dio
-  app_inspect_http: ^0.2.0  # if you use package:http
+  app_inspect: ^0.2.2
+  app_inspect_dio: ^0.2.2   # if you use Dio
+  app_inspect_http: ^0.2.2  # if you use package:http
 ```
 
 1. Wrap your app where you call `runApp`:
@@ -100,24 +99,17 @@ final client = RestClient(dio, errorLogger: AppInspectParseErrorLogger());
 
 Retrofit parses the response itself, so AppInspect can't see which field it read last. It lists the likely fields instead: values of the type the app got, such as every number with decimals when the app expected an `int`.
 
-## Bug reports and sharing
+## Sharing
 
-Without any setup, Share and "Copy report" copy text to the clipboard. To send files and screenshots, connect your share sheet or tracker:
+Without any setup, Share copies text to the clipboard. To send files, connect your share sheet:
 
 ```dart
 AppInspect.wrap(
   const MyApp(),
   config: AppInspectConfig(
-    // Extra lines for every bug report.
-    reportInfo: () => {'App': '2.3.1 (231)', 'Flavor': 'staging', 'User': currentUserId},
-
     // Markdown, or a file's contents when item.fileName is set (such as
     // ProductScreen.har). Hand it to share_plus or your own share sheet.
     onShare: (item) async { /* ... */ },
-
-    // report.markdown, report.screenshot (PNG), report.har and
-    // report.logsText. Send them to Jira, Slack or a share sheet.
-    onReport: (report) async { /* ... */ },
   ),
 );
 ```
@@ -176,7 +168,7 @@ AppInspectConfig(
   maxBodyChars: 500000,                  // longer bodies are cut
   slowThreshold: Duration(seconds: 1),   // slower calls are flagged
   maskedHeaders: {'authorization', 'cookie', 'x-session'},
-  maskedBodyKeys: {'password', 'token', 'otp'},
+  maskedBodyKeys: {'password', 'token', 'otp'}, // in JSON bodies and URL query parameters
   showBubble: true,                      // false: open with AppInspect.open()
   captureLogs: true,                     // debugPrint, Flutter and uncaught errors
   darkTheme: false,                      // true: start in the dark theme
@@ -199,7 +191,7 @@ AppInspect has no plugin dependencies, so it can't cause version conflicts in yo
 | --- | --- |
 | Dio | `AppInspectDioInterceptor` from `app_inspect_dio` |
 | package:http | `AppInspectHttpClient` from `app_inspect_http` |
-| Anything else | Call `AppInspect.store.startCall`, then `completeCall` or `failCall` |
+| Anything else | Call `AppInspect.store.startCall`, then `completeCall`, `failCall` or `cancelCall` |
 
 Not captured: traffic from native SDKs (Firebase, payment SDKs) and clients that don't go through Dio or package:http.
 
@@ -207,7 +199,8 @@ Not captured: traffic from native SDKs (Firebase, payment SDKs) and clients that
 
 - On Android, if your app opts in to predictive back (`android:enableOnBackInvokedCallback="true"`), a back gesture while the inspector is open can also pop your app's screen. The classic back button is handled correctly.
 - `AppInspect.navigatorObserver` tracks one navigator: give it to your root navigator.
-- On Android, the OS line in bug reports comes from the kernel version. Add the Android version with `reportInfo` if you need it.
+- With Dio, an interceptor before AppInspect that sends a request again, such as a token refresh, handles the first answer itself. AppInspect shows that attempt as `Retried`, followed by the new call.
+- The inspector follows the system text size up to 1.3x, so it stays usable on small phones with very large text.
 
 ## Coming next
 

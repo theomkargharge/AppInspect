@@ -54,6 +54,31 @@ void main() {
     expect(curl, isNot(contains('hunter2')));
   });
 
+  test('masks sensitive query parameters in URLs', () {
+    final store = AppInspectStore();
+    final call = store.startCall(
+      method: 'GET',
+      uri: Uri.parse('https://api.test/maps?q=Pune%20station&api_key=SECRET-KEY&Token=abc#top'),
+    );
+
+    expect(masker.url(call.uri),
+        'https://api.test/maps?q=Pune%20station&api_key=$appInspectMask&Token=$appInspectMask#top');
+    expect(masker.path(call), '/maps?q=Pune station&api_key=$appInspectMask&Token=$appInspectMask');
+    expect(buildCurl(call, masker), isNot(contains('SECRET-KEY')));
+
+    const off = AppInspectMasker(AppInspectConfig(), enabled: false);
+    expect(off.url(call.uri), call.uri.toString());
+    expect(off.path(call), call.path);
+  });
+
+  test('leaves URLs without sensitive query parameters as they are', () {
+    final store = AppInspectStore();
+    final call = store.startCall(method: 'GET', uri: Uri.parse('https://api.test/search?q=red%20shoes&page=2&flag'));
+
+    expect(masker.url(call.uri), call.uri.toString());
+    expect(masker.path(call), '/search?q=red shoes&page=2&flag');
+  });
+
   test('decodes JSON text and leaves other text alone', () {
     expect(decodeBody('{"a":[1,2]}'), {
       'a': [1, 2],

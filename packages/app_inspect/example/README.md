@@ -12,5 +12,6 @@ Things to try:
 - Open a product: one call is slow and one is repeated three times. Both get flagged.
 - Tap "Missing product (404)" or "Timeout" for failures in plain words.
 - On a product, tap "Add to cart". The app only says "Something went wrong", but AppInspect shows the server answered 201 and names the field the app failed to read.
-- Hold the bubble to open a bug report, or open the Logs tab to see debugPrint, print and errors.
+- Open the Logs tab to see debugPrint, print and errors, tagged with their screen.
+- Switch tabs and come back: the bubble keeps counting each tab's own calls.
 - On the Account tab, sign in with the demo account. The password, the tokens and the Authorization header are masked.

@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app_inspect/app_inspect.dart';
+import 'package:app_inspect/src/version.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -97,5 +99,35 @@ void main() {
     expect(md, contains("curl -X GET 'https://api.test/slow'"));
     expect(md, contains('### Errors and warnings'));
     expect(md, isNot(contains('hunter2')));
+  });
+
+  test('a token in the URL is masked in every export and in the logs', () {
+    final feed = store.startCall(method: 'GET', uri: Uri.parse('https://api.test/feed?access_token=SECRET&page=1'));
+    store.completeCall(feed, statusCode: 500, body: '{}');
+
+    final exports = [
+      buildCurl(feed, masker),
+      buildHar([feed], masker),
+      buildPostmanCollection([feed], masker, name: 'Feed'),
+      callToMarkdown(feed, masker, slowThreshold: const Duration(seconds: 1)),
+      store.logs.last.message,
+    ];
+    for (final text in exports) {
+      expect(text, isNot(contains('SECRET')));
+    }
+    expect(store.logs.last.message, 'GET /feed?access_token=$appInspectMask&page=1 → 500 Server error');
+
+    final har = jsonDecode(buildHar([feed], masker)) as Map<String, dynamic>;
+    final request = ((har['log'] as Map)['entries'] as List).single['request'] as Map<String, dynamic>;
+    expect(request['queryString'], [
+      {'name': 'access_token', 'value': appInspectMask},
+      {'name': 'page', 'value': '1'},
+    ]);
+  });
+
+  test('the version in exports and Settings is the one in pubspec.yaml', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    expect(RegExp(r'^version: (\S+)$', multiLine: true).firstMatch(pubspec)!.group(1), appInspectVersion);
+    expect(buildHar(const [], masker), contains('"version": "$appInspectVersion"'));
   });
 }

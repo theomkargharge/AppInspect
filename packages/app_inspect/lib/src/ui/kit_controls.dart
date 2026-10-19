@@ -187,28 +187,33 @@ class NlNavBar extends StatelessWidget {
                                     HapticFeedback.selectionClick();
                                     onChanged(i);
                                   },
+                                  // Large system text shrinks to fit the tab instead
+                                  // of overflowing it.
                                   child: Center(
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Badge(
-                                          isLabelVisible: item.badge > 0,
-                                          backgroundColor: t.err,
-                                          label: Text('${item.badge}'),
-                                          child:
-                                              Icon(item.icon, size: 21, color: i == index ? t.accent : t.textSecondary),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        AnimatedDefaultTextStyle(
-                                          duration: const Duration(milliseconds: 200),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: i == index ? FontWeight.w700 : FontWeight.w500,
-                                            color: i == index ? t.accent : t.textSecondary,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Badge(
+                                            isLabelVisible: item.badge > 0,
+                                            backgroundColor: t.err,
+                                            label: Text(item.badge > 99 ? '99+' : '${item.badge}'),
+                                            child: Icon(item.icon,
+                                                size: 21, color: i == index ? t.accent : t.textSecondary),
                                           ),
-                                          child: Text(item.label),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 8),
+                                          AnimatedDefaultTextStyle(
+                                            duration: const Duration(milliseconds: 200),
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: i == index ? FontWeight.w700 : FontWeight.w500,
+                                              color: i == index ? t.accent : t.textSecondary,
+                                            ),
+                                            child: Text(item.label, maxLines: 1, softWrap: false),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -252,7 +257,62 @@ class _BottomFade extends StatelessWidget {
   }
 }
 
-/// A button that briefly turns into a check mark after it copies something.
+/// Less side padding than a regular button, so three fit side by side on a
+/// small phone.
+const ButtonStyle _barButtonStyle = ButtonStyle(
+  padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+);
+
+/// An icon and a label that shrink together when the button is too narrow
+/// for them, instead of overflowing it.
+class _BarButtonLabel extends StatelessWidget {
+  const _BarButtonLabel({super.key, required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 7),
+          Text(label, maxLines: 1, softWrap: false),
+        ],
+      ),
+    );
+  }
+}
+
+/// One of the equal-width buttons in a floating bar, such as Share.
+class NlBarButton extends StatelessWidget {
+  const NlBarButton({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.primary = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = _BarButtonLabel(icon: icon, label: label);
+    return primary
+        ? FilledButton(style: _barButtonStyle, onPressed: onPressed, child: content)
+        : OutlinedButton(style: _barButtonStyle, onPressed: onPressed, child: content);
+  }
+}
+
+/// A bar button that briefly turns into a check mark after it copies
+/// something.
 class NlCopyButton extends StatefulWidget {
   const NlCopyButton({
     super.key,
@@ -265,7 +325,9 @@ class NlCopyButton extends StatefulWidget {
 
   final String label;
   final IconData icon;
-  final Future<void> Function() onPressed;
+
+  /// Copies, and returns whether it worked. Only then does the button say so.
+  final Future<bool> Function() onPressed;
   final bool primary;
   final String doneLabel;
 
@@ -284,8 +346,8 @@ class _NlCopyButtonState extends State<NlCopyButton> {
   }
 
   Future<void> _press() async {
-    await widget.onPressed();
-    if (!mounted) return;
+    final copied = await widget.onPressed();
+    if (!copied || !mounted) return;
     setState(() => _done = true);
     _timer?.cancel();
     _timer = Timer(const Duration(milliseconds: 1400), () {
@@ -295,25 +357,23 @@ class _NlCopyButtonState extends State<NlCopyButton> {
 
   @override
   Widget build(BuildContext context) {
+    // Each label fits on its own, so "Copied" never pushes past the button
+    // edge, not even while it fades in over the old label.
     final content = AnimatedSwitcher(
       duration: const Duration(milliseconds: 220),
       transitionBuilder: (child, animation) => ScaleTransition(
         scale: Tween(begin: 0.85, end: 1.0).animate(animation),
         child: FadeTransition(opacity: animation, child: child),
       ),
-      child: Row(
+      child: _BarButtonLabel(
         key: ValueKey(_done),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(_done ? Icons.check_rounded : widget.icon, size: 18),
-          const SizedBox(width: 7),
-          Text(_done ? widget.doneLabel : widget.label),
-        ],
+        icon: _done ? Icons.check_rounded : widget.icon,
+        label: _done ? widget.doneLabel : widget.label,
       ),
     );
     return widget.primary
-        ? FilledButton(onPressed: _press, child: content)
-        : OutlinedButton(onPressed: _press, child: content);
+        ? FilledButton(style: _barButtonStyle, onPressed: _press, child: content)
+        : OutlinedButton(style: _barButtonStyle, onPressed: _press, child: content);
   }
 }
 

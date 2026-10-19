@@ -17,8 +17,8 @@ class AppInspectConfig {
     this.captureLogs = true,
     this.pin,
     this.onShare,
-    this.onReport,
-    this.reportInfo,
+    @Deprecated('Bug reports are turned off for now, so this is never called.') this.onReport,
+    @Deprecated('Bug reports are turned off for now, so this is never called.') this.reportInfo,
     this.darkTheme = false,
   });
 
@@ -33,10 +33,15 @@ class AppInspectConfig {
   final bool captureLogs;
 
   /// Sends a bug report somewhere. See [AppInspectReportCallback].
+  ///
+  /// Bug reports are turned off for now, so this is never called.
+  @Deprecated('Bug reports are turned off for now, so this is never called.')
   final AppInspectReportCallback? onReport;
 
   /// Extra lines for bug reports, such as the app version, flavor and user ID.
-  /// Called each time a report is built.
+  ///
+  /// Bug reports are turned off for now, so this is never called.
+  @Deprecated('Bug reports are turned off for now, so this is never called.')
   final Map<String, String> Function()? reportInfo;
 
   /// Text bodies longer than this are cut, so a big download can't fill memory.

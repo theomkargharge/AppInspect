@@ -174,6 +174,24 @@ void main() {
     expect(find.text('Checkout started'), findsOneWidget);
   });
 
+  testWidgets('the log tiles add up to All: Info covers debug entries', (tester) async {
+    await tester.pumpWidget(app(const HomeScreen()));
+    await tester.pumpAndSettle();
+    AppInspect.log('Loading products');
+    AppInspect.log('Cache hit', level: AppInspectLogLevel.debug);
+    AppInspect.log('Slow image', level: AppInspectLogLevel.warning);
+    AppInspect.open();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('app_inspect_tab_logs')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Info'));
+    await tester.pumpAndSettle();
+    expect(find.text('Loading products'), findsOneWidget);
+    expect(find.text('Cache hit'), findsOneWidget);
+    expect(find.text('Slow image'), findsNothing);
+  });
+
   testWidgets('a parse error is explained on the call', (tester) async {
     await tester.pumpWidget(app(const HomeScreen()));
     await tester.pumpAndSettle();
@@ -213,31 +231,6 @@ void main() {
 
     expect(copied.last, contains('"version": "1.2"'));
     expect(find.textContaining('get_products.har'), findsOneWidget);
-  });
-
-  testWidgets('holding the bubble opens the bug report', (tester) async {
-    final copied = mockClipboard(tester);
-    await tester.pumpWidget(app(const HomeScreen()));
-    await tester.pumpAndSettle();
-    final call = AppInspect.store.startCall(method: 'GET', uri: Uri.parse('https://api.test/cart'));
-    AppInspect.store.completeCall(call, statusCode: 500, body: '{"error":"down"}');
-    await tester.pump();
-
-    await tester.longPress(find.byIcon(Icons.manage_search_rounded));
-    // Not pumpAndSettle: the screenshot spinner keeps animating in tests.
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Report a bug'), findsOneWidget);
-
-    await tester.enterText(find.byType(TextField), 'Cart shows an error');
-    await tester.pump();
-    await tester.tap(find.text('Copy report'));
-    await tester.pump();
-
-    expect(copied.last, contains('## Bug on HomeScreen'));
-    expect(copied.last, contains('Cart shows an error'));
-    expect(copied.last, contains('| `GET /cart` | 500 Server error |'));
   });
 
   testWidgets('asks for the PIN when one is set', (tester) async {

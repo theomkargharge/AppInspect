@@ -6,12 +6,12 @@ import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../app_inspect.dart';
+import '../schedule.dart';
 import 'bubble.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
 import 'list_page.dart';
 import 'logs_page.dart';
-import 'report_page.dart';
 import 'theme.dart';
 
 /// Sits above the app: the app itself, the bubble, and the inspector.
@@ -78,16 +78,17 @@ class _InspectorPresenterState extends State<_InspectorPresenter> with SingleTic
     super.dispose();
   }
 
-  void _sync() {
-    if (AppInspect.isOpen.value) {
-      setState(() => _shown = true);
-      _controller.forward();
-    } else {
-      _controller.reverse().whenComplete(() {
-        if (mounted && !AppInspect.isOpen.value) setState(() => _shown = false);
+  void _sync() => runWhenSafe(() {
+        if (!mounted) return;
+        if (AppInspect.isOpen.value) {
+          setState(() => _shown = true);
+          _controller.forward();
+        } else {
+          _controller.reverse().whenComplete(() {
+            if (mounted && !AppInspect.isOpen.value) setState(() => _shown = false);
+          });
+        }
       });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -138,28 +139,34 @@ class _AppInspectInspectorState extends State<AppInspectInspector> {
       valueListenable: AppInspect.darkTheme,
       builder: (context, dark, _) {
         final theme = buildAppInspectTheme(dark: dark);
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-          child: Localizations(
-            locale: const Locale('en', 'US'),
-            delegates: const [
-              DefaultMaterialLocalizations.delegate,
-              DefaultCupertinoLocalizations.delegate,
-              DefaultWidgetsLocalizations.delegate,
-            ],
-            child: Theme(
-              data: theme,
-              child: DefaultTextEditingShortcuts(
-                child: ScaffoldMessenger(
-                  child: Material(
-                    color: theme.scaffoldBackgroundColor,
-                    child: HeroControllerScope(
-                      controller: _heroes,
-                      child: Navigator(
-                        key: appInspectNavigatorKey,
-                        onGenerateRoute: (settings) => MaterialPageRoute<void>(
-                          settings: settings,
-                          builder: (_) => const _InspectorHome(),
+        // The inspector is dense, so it follows the system text size up to
+        // 1.3x, about the largest standard setting, and stays usable on small
+        // phones beyond that.
+        return MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 1.3,
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+            child: Localizations(
+              locale: const Locale('en', 'US'),
+              delegates: const [
+                DefaultMaterialLocalizations.delegate,
+                DefaultCupertinoLocalizations.delegate,
+                DefaultWidgetsLocalizations.delegate,
+              ],
+              child: Theme(
+                data: theme,
+                child: DefaultTextEditingShortcuts(
+                  child: ScaffoldMessenger(
+                    child: Material(
+                      color: theme.scaffoldBackgroundColor,
+                      child: HeroControllerScope(
+                        controller: _heroes,
+                        child: Navigator(
+                          key: appInspectNavigatorKey,
+                          onGenerateRoute: (settings) => MaterialPageRoute<void>(
+                            settings: settings,
+                            builder: (_) => const _InspectorHome(),
+                          ),
                         ),
                       ),
                     ),
@@ -199,26 +206,6 @@ class _InspectorTabs extends StatefulWidget {
 
 class _InspectorTabsState extends State<_InspectorTabs> {
   int _tab = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    AppInspect.store.addListener(_openPendingReport);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _openPendingReport());
-  }
-
-  @override
-  void dispose() {
-    AppInspect.store.removeListener(_openPendingReport);
-    super.dispose();
-  }
-
-  /// Holding the bubble asks for the bug report straight away.
-  void _openPendingReport() {
-    if (!appInspectReportPending || !mounted) return;
-    appInspectReportPending = false;
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ReportPage()));
-  }
 
   @override
   Widget build(BuildContext context) {

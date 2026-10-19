@@ -67,7 +67,7 @@ class AppInspectStore extends ChangeNotifier {
     final where = error.field ?? (error.likelyFields.isEmpty ? null : 'likely ${error.likelyFields.first}');
     addLog(
       AppInspectLogLevel.error,
-      'Couldn\'t read the response of ${call.method} ${call.path}'
+      'Couldn\'t read the response of ${call.method} ${_maskedPath(call)}'
       '${where == null ? '' : ' at $where'}: ${error.message}',
       source: 'Parse error',
       details: error.stack,
@@ -179,12 +179,30 @@ class AppInspectStore extends ChangeNotifier {
     _scheduleNotify();
   }
 
+  /// Records a call the app cancelled on purpose, such as a search that was
+  /// typed over or a screen that closed. It shows as `Cancelled` and doesn't
+  /// count as a failure, so the bubble stays calm.
+  void cancelCall(AppInspectCall call, {String? detail}) {
+    if (!call.isPending) return;
+    call
+      ..state = AppInspectCallState.failed
+      ..cancelled = true
+      ..error = 'Cancelled'
+      ..errorDetail = detail
+      ..endedAt = DateTime.now();
+    _scheduleNotify();
+  }
+
   void _logFailure(AppInspectCall call) => addLog(
         AppInspectLogLevel.warning,
-        '${call.method} ${call.path} → ${call.statusLabel}',
+        '${call.method} ${_maskedPath(call)} → ${call.statusLabel}',
         source: 'Network',
         call: call,
       );
+
+  /// Log lines are written once, so a token in the URL is always masked
+  /// there. The call itself keeps it, for a developer to see in Settings.
+  String _maskedPath(AppInspectCall call) => AppInspectMasker(config).path(call);
 
   /// Fills in [AppInspectCall.responseSize] when the client handed over decoded
   /// JSON without a size, such as a Dio response that came compressed or in

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../format.dart';
 import '../app_inspect.dart';
+import '../version.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
 import 'theme.dart';
@@ -124,7 +125,7 @@ class SettingsPage extends StatelessWidget {
                 const NlSectionLabel('About'),
                 NlCard(
                   child: Text(
-                    'AppInspect 0.2.1. On in debug builds, and in other builds only with '
+                    'AppInspect $appInspectVersion. On in debug builds, and in other builds only with '
                     '--dart-define=APP_INSPECT=true. Production builds don\'t contain it.',
                     style: TextStyle(fontSize: 13, height: 1.5, color: t.textSecondary),
                   ),

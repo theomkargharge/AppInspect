@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'format.dart';
 import 'models.dart';
+import 'version.dart';
 
 const JsonEncoder _pretty = JsonEncoder.withIndent('  ');
 
@@ -37,13 +38,13 @@ String buildHar(List<AppInspectCall> calls, AppInspectMasker masker) {
           'time': c.duration?.inMilliseconds ?? 0,
           'request': {
             'method': c.method,
-            'url': c.uri.toString(),
+            'url': masker.url(c.uri),
             'httpVersion': 'HTTP/1.1',
             'cookies': <Object>[],
             'headers': headerList(c.requestHeaders),
             'queryString': [
               for (final e in c.uri.queryParametersAll.entries)
-                for (final v in e.value) {'name': e.key, 'value': v},
+                for (final v in e.value) {'name': e.key, 'value': masker.isMaskedKey(e.key) ? appInspectMask : v},
             ],
             if (requestText.isNotEmpty)
               'postData': {'mimeType': _mimeOf(c.requestHeaders, 'application/json'), 'text': requestText},
@@ -77,7 +78,7 @@ String buildHar(List<AppInspectCall> calls, AppInspectMasker masker) {
   return _pretty.convert({
     'log': {
       'version': '1.2',
-      'creator': {'name': 'AppInspect', 'version': '0.2.1'},
+      'creator': {'name': 'AppInspect', 'version': appInspectVersion},
       'entries': entries,
     },
   });
@@ -94,13 +95,13 @@ String buildPostmanCollection(List<AppInspectCall> calls, AppInspectMasker maske
     'item': [
       for (final c in calls)
         {
-          'name': '${c.method} ${c.path}',
+          'name': '${c.method} ${masker.path(c)}',
           'request': {
             'method': c.method,
             'header': [
               for (final e in c.requestHeaders.entries) {'key': e.key, 'value': masker.header(e.key, e.value)},
             ],
-            'url': c.uri.toString(),
+            'url': masker.url(c.uri),
             if (c.requestBody != null)
               'body': {
                 'mode': 'raw',
@@ -165,12 +166,12 @@ String buildReportMarkdown({
       ..writeln('| --- | --- | --- | --- |');
     for (final c in calls) {
       final issues = insightsFor(c, slowThreshold: slowThreshold).map((i) => i.title).join(', ');
-      out.writeln('| `${c.method} ${c.path}` | ${c.statusLabel} | ${formatDuration(c.duration)} | '
+      out.writeln('| `${c.method} ${masker.path(c)}` | ${c.statusLabel} | ${formatDuration(c.duration)} | '
           '${issues.isEmpty ? '—' : issues} |');
     }
     for (final c in calls.where((c) => c.isError)) {
       out
-        ..writeln('\n#### ${c.method} ${c.path} · ${c.statusLabel}')
+        ..writeln('\n#### ${c.method} ${masker.path(c)} · ${c.statusLabel}')
         ..writeln(c.parseError != null ? describeParseError(c, c.parseError!) : '')
         ..writeln('```bash')
         ..writeln(buildCurl(c, masker))

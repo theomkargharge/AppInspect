@@ -74,6 +74,10 @@ class AppInspectCall {
   /// True when a body was cut at `AppInspectConfig.maxBodyChars`.
   bool bodyTruncated = false;
 
+  /// True when the app cancelled the call on purpose, such as a search that
+  /// was typed over. A cancelled call isn't a failure.
+  bool cancelled = false;
+
   /// Set when the app failed to read this response, even though the server
   /// answered. This is the classic "it works on my side" bug.
   AppInspectParseError? parseError;
@@ -83,8 +87,9 @@ class AppInspectCall {
   bool get isRepeated => repeatCount > 1;
 
   /// A failure without a response, a 4xx or 5xx response, or a response the
-  /// app couldn't read.
-  bool get isError => state == AppInspectCallState.failed || (statusCode ?? 0) >= 400 || parseError != null;
+  /// app couldn't read. A call the app cancelled isn't one.
+  bool get isError =>
+      (state == AppInspectCallState.failed && !cancelled) || (statusCode ?? 0) >= 400 || parseError != null;
 
   bool isSlow(Duration threshold) {
     final d = duration;
