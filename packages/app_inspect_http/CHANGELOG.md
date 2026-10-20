@@ -1,5 +1,6 @@
 ## 0.2.2
 
+* The repository moved to https://github.com/theomkargharge/AppInspect.
 * Fixed: when the app stopped reading a response early, such as with `stream.first`, the call stayed pending forever. It's now recorded with the start of the body and the size the server announced.
 * Works with app_inspect 0.2.2.
 

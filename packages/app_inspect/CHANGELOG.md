@@ -1,5 +1,6 @@
 ## 0.2.2
 
+* The repository moved to https://github.com/theomkargharge/AppInspect.
 * Fixed: the bubble showed the number of failures instead of the number of API calls once something failed. It now always counts this screen's calls, and turns red when something fails.
 * Fixed: a tab you came back to started again from zero calls. It now keeps its calls, the way a screen you go back to does.
 * Fixed: copying JSON or cURL on a phone overflowed the button ("Copied" didn't fit), and on narrow phones the labels overflowed even before copying. The bar buttons now fit any width and text size, and only say "Copied" when copying worked.
