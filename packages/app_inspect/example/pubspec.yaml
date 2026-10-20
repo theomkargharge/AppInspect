@@ -12,9 +12,9 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.0
-  app_inspect: ^0.2.0
-  app_inspect_dio: ^0.2.0
-  app_inspect_http: ^0.2.0
+  app_inspect: ^0.2.2
+  app_inspect_dio: ^0.2.2
+  app_inspect_http: ^0.2.2
 
 dev_dependencies:
   flutter_test:

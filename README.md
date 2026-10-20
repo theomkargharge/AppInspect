@@ -18,3 +18,18 @@ flutter pub get
 flutter analyze packages
 cd packages/app_inspect && flutter test
 ```
+
+The tests include a layout sweep: every inspector screen on eight phone and tablet sizes, at three text sizes, must lay out without an overflow.
+
+To look at the inspector's screens as images:
+
+```sh
+cd packages/app_inspect && flutter test test/visual_review_test.dart --dart-define=SHOTS_DIR=/tmp/shots
+```
+
+On an iOS simulator, from `packages/app_inspect/example`:
+
+```sh
+tool/take_store_screenshots.sh   # the pub.dev screenshots, saved as WebP
+tool/record_linkedin_demo.sh     # the 1080x1920 demo video, in demo_output/
+```

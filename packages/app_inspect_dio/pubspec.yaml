@@ -1,6 +1,6 @@
 name: app_inspect_dio
 description: Captures Dio requests for the AppInspect in-app network inspector.
-version: 0.2.1
+version: 0.2.2
 repository: https://github.com/theomkargharge/NetLense/tree/main/packages/app_inspect_dio
 issue_tracker: https://github.com/theomkargharge/NetLense/issues
 topics:
@@ -17,7 +17,7 @@ dependencies:
   dio: ^5.4.0
   flutter:
     sdk: flutter
-  app_inspect: ^0.2.0
+  app_inspect: ^0.2.2
 
 dev_dependencies:
   flutter_test:

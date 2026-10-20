@@ -42,6 +42,46 @@ ResponseBody json(String body, int status) => ResponseBody.fromString(
 Future<Response<ResponseBody>> getStream(Dio dio, String path) =>
     dio.get<ResponseBody>(path, options: Options(responseType: ResponseType.stream));
 
+/// Answers after [delay], so a test can cancel the request while it waits.
+class SlowAdapter implements HttpClientAdapter {
+  SlowAdapter(this.delay);
+
+  final Duration delay;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) =>
+      Future.delayed(delay, () => ResponseBody.fromString('{}', 200));
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// Refreshes an expired token on a 401 and sends the request again, the way
+/// most apps do. It sits before AppInspect, as the README asks.
+class RefreshTokenInterceptor extends Interceptor {
+  RefreshTokenInterceptor(this.dio);
+
+  final Dio dio;
+
+  @override
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode == 401 && err.requestOptions.headers['Authorization'] != 'Bearer fresh') {
+      err.requestOptions.headers['Authorization'] = 'Bearer fresh';
+      try {
+        handler.resolve(await dio.fetch<dynamic>(err.requestOptions));
+      } on DioException catch (e) {
+        handler.next(e);
+      }
+      return;
+    }
+    handler.next(err);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -285,5 +325,46 @@ void main() {
         {'field': 'file', 'filename': 'a.png', 'bytes': 3, 'contentType': 'image/png'},
       ],
     });
+  });
+
+  test('a request sent again after a token refresh doesn\'t stay pending', () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test'));
+    dio
+      ..httpClientAdapter = FakeAdapter((options) => options.headers['Authorization'] == 'Bearer fresh'
+          ? json('{"name":"QA"}', 200)
+          : json('{"error":"token expired"}', 401))
+      ..interceptors.add(RefreshTokenInterceptor(dio))
+      ..interceptors.add(AppInspectDioInterceptor());
+
+    final res = await dio.get<dynamic>('/me', options: Options(headers: {'Authorization': 'Bearer old'}));
+
+    expect(res.data, {'name': 'QA'});
+    final calls = AppInspect.store.calls;
+    expect(calls, hasLength(2));
+    expect(calls.first.isPending, isFalse);
+    expect(calls.first.statusLabel, 'Retried');
+    expect(insightsFor(calls.first, slowThreshold: const Duration(seconds: 1)).first.title, 'Sent again');
+    expect(calls.last.statusLabel, '200 OK');
+    expect(calls.last.requestHeaders['Authorization'], 'Bearer fresh');
+  });
+
+  test('a request the app cancels isn\'t a failure', () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.test'))
+      ..httpClientAdapter = SlowAdapter(const Duration(milliseconds: 300))
+      ..interceptors.add(AppInspectDioInterceptor());
+    final token = CancelToken();
+
+    final search = dio.get<dynamic>('/search', queryParameters: {'q': 'sho'}, cancelToken: token);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    token.cancel('typed over');
+    await expectLater(search, throwsA(isA<DioException>()));
+
+    final call = AppInspect.store.calls.single;
+    expect(call.isPending, isFalse);
+    expect(call.cancelled, isTrue);
+    expect(call.isError, isFalse);
+    expect(call.statusLabel, 'Cancelled');
+    expect(AppInspect.store.unseenErrors.value, 0, reason: 'the bubble stays calm');
+    expect(AppInspect.store.logs.where((l) => identical(l.call, call)), isEmpty, reason: 'nothing to warn about');
   });
 }

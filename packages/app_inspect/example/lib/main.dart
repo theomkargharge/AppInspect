@@ -12,8 +12,19 @@ final Dio dio = Dio(BaseOptions(
   connectTimeout: const Duration(seconds: 10),
   receiveTimeout: const Duration(seconds: 15),
 ))
-  // Add AppInspect last, so it sees the headers other interceptors add.
-  ..interceptors.add(AppInspectDioInterceptor());
+  // Add AppInspect last, so it sees the headers other interceptors add, such
+  // as the token below. AppInspect masks it.
+  ..interceptors.addAll([AuthInterceptor(), AppInspectDioInterceptor()]);
+
+/// Adds the session token to every request, the way most apps do.
+/// dummyjson.com doesn't check it on these endpoints.
+class AuthInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.headers['Authorization'] = 'Bearer kartly-session-7f3a9c2e5d41b8';
+    handler.next(options);
+  }
+}
 
 final AppInspectHttpClient httpClient = AppInspectHttpClient();
 
@@ -21,12 +32,7 @@ final AppInspectHttpClient httpClient = AppInspectHttpClient();
 void main() => AppInspect.runZoned(() {
       runApp(AppInspect.wrap(
         const ShopApp(),
-        config: AppInspectConfig(
-          slowThreshold: const Duration(milliseconds: 800),
-          // Extra lines for bug reports. A real app would add its version,
-          // flavor and the signed-in user here.
-          reportInfo: () => {'App': 'Kartly demo 1.0.0 (1)', 'Environment': 'dummyjson.com'},
-        ),
+        config: const AppInspectConfig(slowThreshold: Duration(milliseconds: 800)),
       ));
     });
 

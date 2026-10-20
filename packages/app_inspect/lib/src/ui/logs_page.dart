@@ -6,7 +6,6 @@ import '../app_inspect.dart';
 import 'detail_page.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
-import 'report_page.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -31,8 +30,13 @@ class _LogsPageState extends State<LogsPage> {
     super.dispose();
   }
 
+  /// Info also covers debug entries, so the tiles add up to All.
+  static bool _inLevel(AppInspectLog log, AppInspectLogLevel level) =>
+      level == AppInspectLogLevel.info ? log.level.index <= level.index : log.level == level;
+
   bool _matches(AppInspectLog log, AppInspectVisit visit) {
-    if (_level != null && log.level != _level) return false;
+    final level = _level;
+    if (level != null && !_inLevel(log, level)) return false;
     if (_thisScreen && !identical(log.visit, visit)) return false;
     final q = _query.trim().toLowerCase();
     return q.isEmpty || '${log.message} ${log.source} ${log.visit.name}'.toLowerCase().contains(q);
@@ -49,7 +53,7 @@ class _LogsPageState extends State<LogsPage> {
         final store = AppInspect.store;
         final visit = store.currentVisit;
         final logs = store.logs.where((l) => _matches(l, visit)).toList().reversed.toList();
-        int count(AppInspectLogLevel level) => store.logs.where((l) => l.level == level).length;
+        int count(AppInspectLogLevel level) => store.logs.where((l) => _inLevel(l, level)).length;
         return Scaffold(
           body: SafeArea(
             bottom: false,
@@ -86,14 +90,6 @@ class _LogsPageState extends State<LogsPage> {
                             ],
                           ),
                         ),
-                        NlIconButton(
-                          icon: Icons.bug_report_outlined,
-                          tooltip: 'Report a bug',
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(builder: (_) => const ReportPage()),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         NlIconButton(
                           icon: Icons.delete_sweep_outlined,
                           tooltip: 'Clear logs',

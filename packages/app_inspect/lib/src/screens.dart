@@ -35,6 +35,8 @@ class AppInspectNavigatorObserver extends NavigatorObserver {
     'UiKitView',
     'AppKitView',
     'HtmlElementView',
+    // Names its own part of the screen.
+    'AppInspectScreen',
   };
 
   @override
@@ -48,10 +50,17 @@ class AppInspectNavigatorObserver extends NavigatorObserver {
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    if (oldRoute != null) _pages.remove(oldRoute);
+    final index = oldRoute == null ? -1 : _pages.indexOf(oldRoute);
+    if (index >= 0) _pages.removeAt(index);
     if (newRoute is PageRoute) {
-      _pages.add(newRoute);
-      _enter(newRoute);
+      if (index >= 0 && index < _pages.length) {
+        // Replaced below the top, such as with replaceRouteBelow. It gets a
+        // visit when it shows.
+        _pages.insert(index, newRoute);
+      } else {
+        _pages.add(newRoute);
+        _enter(newRoute);
+      }
     } else {
       _resumeTop();
     }
@@ -72,13 +81,22 @@ class AppInspectNavigatorObserver extends NavigatorObserver {
     if (wasTop) _resumeTop();
   }
 
-  /// Starts a visit for a part of the current route, such as a tab.
-  void tagScreen(String name) {
+  /// Starts a visit for a part of the current route, such as a tab, and
+  /// returns it. With [resume], an earlier visit of the same part carries on
+  /// instead, so a tab you come back to keeps its calls.
+  AppInspectVisit tagScreen(String name, {AppInspectVisit? resume}) {
     final top = _pages.isEmpty ? null : _pages.last;
     final current = _store.currentVisit;
-    if (current.name == name && (top == null || identical(_visitOf[top], current))) return;
-    final visit = _store.startVisit(name);
+    if (current.name == name && (top == null || identical(_visitOf[top], current))) return current;
+    final AppInspectVisit visit;
+    if (resume != null && resume.name == name) {
+      visit = resume;
+      _store.resumeVisit(resume);
+    } else {
+      visit = _store.startVisit(name);
+    }
     if (top != null) _visitOf[top] = visit;
+    return visit;
   }
 
   void _enter(PageRoute<dynamic> route) {
@@ -98,8 +116,14 @@ class AppInspectNavigatorObserver extends NavigatorObserver {
 
   void _resumeTop() {
     if (_pages.isEmpty) return;
-    final visit = _visitOf[_pages.last];
-    if (visit != null) _store.resumeVisit(visit);
+    final top = _pages.last;
+    final visit = _visitOf[top];
+    if (visit != null) {
+      _store.resumeVisit(visit);
+    } else if (top is PageRoute) {
+      // Never shown before, such as a route replaced below the top.
+      _enter(top);
+    }
   }
 
   /// The first widget on the route whose type ends in Screen, Page or View,
@@ -143,6 +167,9 @@ class _AppInspectScreenState extends State<AppInspectScreen> {
   bool _visible = true;
   bool _wasShowing = false;
 
+  /// This part's visit, carried on each time it shows again.
+  AppInspectVisit? _visit;
+
   /// IndexedStack hides tabs with Visibility. Offstage-style containers turn
   /// off tickers instead. Either one means the tab isn't showing.
   bool get _showing => _visible && (_ticker?.value ?? true);
@@ -166,13 +193,13 @@ class _AppInspectScreenState extends State<AppInspectScreen> {
   @override
   void didUpdateWidget(AppInspectScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.name != widget.name && _showing) AppInspect.markScreen(widget.name);
+    if (oldWidget.name != widget.name && _showing) _visit = appInspectShowScreen(widget.name);
   }
 
   /// Tags the screen each time it starts showing.
   void _update() {
     final showing = _showing;
-    if (showing && !_wasShowing) AppInspect.markScreen(widget.name);
+    if (showing && !_wasShowing) _visit = appInspectShowScreen(widget.name, resume: _visit);
     _wasShowing = showing;
   }
 

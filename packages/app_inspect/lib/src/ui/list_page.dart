@@ -6,7 +6,6 @@ import '../app_inspect.dart';
 import 'detail_page.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
-import 'report_page.dart';
 import 'settings_page.dart';
 import 'share_sheet.dart';
 import 'theme.dart';
@@ -53,7 +52,7 @@ class _CallListPageState extends State<CallListPage> {
   Widget build(BuildContext context) {
     final t = AppInspectTokens.of(context);
     return ListenableBuilder(
-      listenable: Listenable.merge([AppInspect.store, AppInspect.slowThreshold]),
+      listenable: Listenable.merge([AppInspect.store, AppInspect.slowThreshold, AppInspect.maskData]),
       builder: (context, _) {
         final store = AppInspect.store;
         final visit = store.currentVisit;
@@ -236,12 +235,6 @@ class _Header extends StatelessWidget {
             ),
           ),
           NlIconButton(
-            icon: Icons.bug_report_outlined,
-            tooltip: 'Report a bug',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ReportPage())),
-          ),
-          const SizedBox(width: 8),
-          NlIconButton(
             icon: Icons.tune_rounded,
             tooltip: 'Settings',
             onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsPage())),
@@ -291,6 +284,7 @@ class _CallCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppInspectTokens.of(context);
     final fresh = DateTime.now().difference(call.startedAt) < const Duration(seconds: 2);
+    final path = currentMasker().path(call);
     return NlAppear(
       animate: fresh,
       child: Padding(
@@ -300,7 +294,7 @@ class _CallCard extends StatelessWidget {
             MaterialPageRoute<void>(builder: (_) => CallDetailPage(call: call)),
           ),
           onLongPress: () => showCallActions(context, call),
-          semanticLabel: '${call.method} ${call.path}, ${call.statusLabel}',
+          semanticLabel: '${call.method} $path, ${call.statusLabel}',
           child: Container(
             padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
             decoration: BoxDecoration(
@@ -321,7 +315,7 @@ class _CallCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              call.path,
+                              path,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style:

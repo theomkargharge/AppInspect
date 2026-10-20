@@ -30,6 +30,18 @@ class AppInspectDioInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     if (AppInspect.isEnabled) {
       try {
+        // The same request again, such as after a token refresh in an
+        // interceptor before this one. That one handled the first answer, so
+        // it never reached AppInspect: close the attempt instead of leaving it
+        // pending forever.
+        final previous = options.extra[_callKey];
+        if (previous is AppInspectCall && previous.isPending) {
+          AppInspect.store.failCall(
+            previous,
+            error: 'Retried',
+            detail: 'Sent again before this attempt finished. Its answer was handled before AppInspect saw it.',
+          );
+        }
         options.extra[_callKey] = AppInspect.store.startCall(
           method: options.method,
           uri: options.uri,
@@ -64,7 +76,12 @@ class AppInspectDioInterceptor extends Interceptor {
           _complete(err.requestOptions, response);
         } else {
           final call = err.requestOptions.extra[_callKey];
-          if (call is AppInspectCall) {
+          if (call is! AppInspectCall) {
+            // Not recorded, such as a request cancelled before it started.
+          } else if (err.type == DioExceptionType.cancel) {
+            // On purpose, such as a search that was typed over: not a failure.
+            AppInspect.store.cancelCall(call, detail: err.message ?? err.error?.toString());
+          } else {
             AppInspect.store.failCall(
               call,
               error: plainError(err.type),

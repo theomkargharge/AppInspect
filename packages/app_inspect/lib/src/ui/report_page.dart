@@ -16,6 +16,8 @@ enum _SendState { idle, sending, done }
 
 /// One-tap bug report: a screenshot, this screen's calls, its errors and
 /// warnings, and device info, as Markdown with files attached.
+///
+/// Turned off for now: nothing in the inspector opens this page.
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
 
@@ -60,6 +62,7 @@ class _ReportPageState extends State<ReportPage> {
 
   Future<void> _send() async {
     final markdown = _markdown();
+    // ignore: deprecated_member_use_from_same_package
     final onReport = AppInspect.config.onReport;
     setState(() => _state = _SendState.sending);
     try {
@@ -110,6 +113,7 @@ class _ReportPageState extends State<ReportPage> {
     final calls = _allCalls;
     final failed = calls.where((c) => c.isError).length;
     final problems = _problems.length;
+    // ignore: deprecated_member_use_from_same_package
     final hasHandler = AppInspect.config.onReport != null;
     return Scaffold(
       extendBody: true,

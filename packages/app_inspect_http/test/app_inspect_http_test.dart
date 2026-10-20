@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -59,5 +62,46 @@ void main() {
     final call = AppInspect.store.calls.single;
     expect(call.statusLabel, 'No connection');
     expect(AppInspect.store.unseenErrors.value, 1);
+  });
+
+  test('a response the app stops reading early doesn\'t stay pending', () async {
+    final client = AppInspectHttpClient(MockClient.streaming((request, body) async {
+      return http.StreamedResponse(
+        Stream.fromIterable([utf8.encode('line 1\n'), utf8.encode('line 2\n')]),
+        200,
+        contentLength: 14,
+        headers: {'content-type': 'text/plain'},
+      );
+    }));
+
+    final response = await client.send(http.Request('GET', Uri.parse('https://api.test/feed')));
+    expect(await response.stream.first, utf8.encode('line 1\n'));
+
+    final call = AppInspect.store.calls.single;
+    expect(call.isPending, isFalse);
+    expect(call.statusLabel, '200 OK');
+    expect(call.responseBody, 'line 1\n');
+    expect(call.responseSize, 14, reason: 'the size the server announced');
+    expect(call.bodyTruncated, isTrue);
+  });
+
+  test('passes pauses on to the response, and still records it', () async {
+    final client = AppInspectHttpClient(MockClient((_) async => http.Response('{"items":[1,2,3]}', 200)));
+
+    final response = await client.send(http.Request('GET', Uri.parse('https://api.test/items')));
+    final bytes = <int>[];
+    final done = Completer<void>();
+    late final StreamSubscription<List<int>> sub;
+    sub = response.stream.listen((chunk) {
+      bytes.addAll(chunk);
+      sub.pause(Future<void>.delayed(const Duration(milliseconds: 10)));
+    }, onDone: done.complete);
+    await done.future;
+
+    expect(utf8.decode(bytes), '{"items":[1,2,3]}');
+    final call = AppInspect.store.calls.single;
+    expect(call.statusLabel, '200 OK');
+    expect(call.responseBody, '{"items":[1,2,3]}');
+    expect(call.bodyTruncated, isFalse);
   });
 }

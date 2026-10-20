@@ -5,14 +5,14 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import '../app_inspect.dart';
+import '../schedule.dart';
 import 'theme.dart';
 
 /// The floating button over the app.
 ///
-/// Tap it to open AppInspect, hold it for a bug report, and drag it anywhere: it
-/// springs to the nearest edge when you let go. It counts the calls on the
-/// current screen, turns red when something fails, and pulses once for each
-/// new failure.
+/// Tap it to open AppInspect, and drag it anywhere: it springs to the nearest
+/// edge when you let go. Its badge counts the API calls on the current screen.
+/// It turns red when something fails, and pulses once for each new failure.
 class AppInspectBubble extends StatefulWidget {
   const AppInspectBubble({super.key});
 
@@ -50,7 +50,13 @@ class _AppInspectBubbleState extends State<AppInspectBubble> with TickerProvider
 
   void _onErrors() {
     final errors = AppInspect.store.unseenErrors.value;
-    if (errors > _seenErrors && !AppInspect.isOpen.value) _pulse.forward(from: 0);
+    if (errors > _seenErrors && !AppInspect.isOpen.value) {
+      // Starting the pulse repaints the bubble, which can't happen while
+      // Flutter builds the app, where many errors are reported.
+      runWhenSafe(() {
+        if (mounted) _pulse.forward(from: 0);
+      });
+    }
     _seenErrors = errors;
   }
 
@@ -96,11 +102,6 @@ class _AppInspectBubbleState extends State<AppInspectBubble> with TickerProvider
                       HapticFeedback.selectionClick();
                       AppInspect.open();
                     },
-                    onLongPress: () {
-                      _setPressed(false);
-                      HapticFeedback.mediumImpact();
-                      AppInspect.openReport();
-                    },
                     onPanStart: (_) {
                       _snap.stop();
                       _setPressed(true);
@@ -140,96 +141,126 @@ class _AppInspectBubbleState extends State<AppInspectBubble> with TickerProvider
   }
 }
 
-class _BubbleFace extends StatelessWidget {
+/// The bubble itself: the AppInspect icon, a ring and the call count.
+class _BubbleFace extends StatefulWidget {
   const _BubbleFace({required this.pulse});
 
   final Animation<double> pulse;
 
   @override
+  State<_BubbleFace> createState() => _BubbleFaceState();
+}
+
+class _BubbleFaceState extends State<_BubbleFace> {
+  late final Listenable _changes =
+      Listenable.merge([AppInspect.store, AppInspect.store.unseenErrors, AppInspect.darkTheme]);
+
+  @override
+  void initState() {
+    super.initState();
+    _changes.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    _changes.removeListener(_changed);
+    super.dispose();
+  }
+
+  /// A failure can be counted while Flutter builds the app, such as an error
+  /// thrown in a build method, so the bubble catches up after that frame.
+  void _changed() => runWhenSafe(() {
+        if (mounted) setState(() {});
+      });
+
+  @override
   Widget build(BuildContext context) {
     final store = AppInspect.store;
-    return ValueListenableBuilder<bool>(
-      valueListenable: AppInspect.darkTheme,
-      builder: (context, dark, _) {
-        final t = dark ? AppInspectTokens.dark : AppInspectTokens.light;
-        return ListenableBuilder(
-          listenable: Listenable.merge([store, store.unseenErrors]),
-          builder: (context, _) {
-            final errors = store.unseenErrors.value;
-            final count = store.callsFor(store.currentVisit).length;
-            final alert = errors > 0;
-            final color = alert ? t.err : t.accent;
-            final badge = alert ? errors : count;
-            const s = AppInspectBubble.size;
-            return Semantics(
-              button: true,
-              label: alert
-                  ? 'AppInspect. $errors failures. Opens the network inspector. Hold for a bug report.'
-                  : 'AppInspect. $count calls on this screen. Opens the network inspector. Hold for a bug report.',
-              child: SizedBox(
-                width: s,
-                height: s,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Positioned.fill(
-                      child: AnimatedBuilder(
-                        animation: pulse,
-                        builder: (context, _) => CustomPaint(painter: _HaloPainter(pulse.value, t.err)),
+    final t = AppInspect.darkTheme.value ? AppInspectTokens.dark : AppInspectTokens.light;
+    final errors = store.unseenErrors.value;
+    final count = store.callsFor(store.currentVisit).length;
+    final alert = errors > 0;
+    final color = alert ? t.err : t.accent;
+    // Always the number of calls on this screen. Red says something failed;
+    // "!" says so when this screen hasn't made a call.
+    final badge = count > 99 ? '99+' : (count > 0 ? '$count' : (alert ? '!' : null));
+    const s = AppInspectBubble.size;
+    return Semantics(
+      button: true,
+      // The label already says the count, so the badge isn't read again.
+      excludeSemantics: true,
+      label: [
+        'AppInspect',
+        '$count ${count == 1 ? 'call' : 'calls'} on this screen',
+        if (alert) '$errors new ${errors == 1 ? 'error' : 'errors'}',
+        'Opens the network inspector.',
+      ].join('. '),
+      child: SizedBox(
+        width: s,
+        height: s,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: widget.pulse,
+                builder: (context, _) => CustomPaint(painter: _HaloPainter(widget.pulse.value, t.err)),
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: s,
+              height: s,
+              decoration: BoxDecoration(
+                color: t.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: color, width: 2.5),
+                boxShadow: t.floatShadow,
+              ),
+              child: Icon(Icons.manage_search_rounded, size: 27, color: color),
+            ),
+            if (badge != null)
+              Positioned(
+                top: -3,
+                right: -3,
+                child: TweenAnimationBuilder<double>(
+                  key: ValueKey('$alert$badge'),
+                  tween: Tween(begin: 0.4, end: 1),
+                  duration: const Duration(milliseconds: 520),
+                  curve: Curves.elasticOut,
+                  builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(color: t.surface, width: 2),
+                    ),
+                    child: Text(
+                      badge,
+                      key: const ValueKey('app_inspect_bubble_badge'),
+                      maxLines: 1,
+                      softWrap: false,
+                      // A badge this small stays readable up to a little
+                      // larger text, and never outgrows the bubble.
+                      textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2),
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.2,
+                        fontWeight: FontWeight.w800,
+                        color: t.onAccent,
+                        decoration: TextDecoration.none,
                       ),
                     ),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: s,
-                      height: s,
-                      decoration: BoxDecoration(
-                        color: t.surface,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: color, width: 2.5),
-                        boxShadow: t.floatShadow,
-                      ),
-                      child: Icon(Icons.manage_search_rounded, size: 27, color: color),
-                    ),
-                    if (badge > 0)
-                      Positioned(
-                        top: -3,
-                        right: -3,
-                        child: TweenAnimationBuilder<double>(
-                          key: ValueKey('$alert$badge'),
-                          tween: Tween(begin: 0.4, end: 1),
-                          duration: const Duration(milliseconds: 520),
-                          curve: Curves.elasticOut,
-                          builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
-                          child: Container(
-                            constraints: const BoxConstraints(minWidth: 22),
-                            height: 22,
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: color,
-                              borderRadius: BorderRadius.circular(11),
-                              border: Border.all(color: t.surface, width: 2),
-                            ),
-                            child: Text(
-                              badge > 99 ? '99+' : '$badge',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: t.onAccent,
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
               ),
-            );
-          },
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

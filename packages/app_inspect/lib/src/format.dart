@@ -35,6 +35,53 @@ class AppInspectMasker {
         for (final e in headers.entries) e.key: header(e.key, e.value),
       };
 
+  /// [uri] as text, with the values of sensitive query parameters masked,
+  /// such as `?token=••••••••`. Used for cURL, HAR and Postman.
+  String url(Uri uri) {
+    final text = uri.toString();
+    if (!_masksQuery(uri)) return text;
+    // Uri.replace would percent-encode the mask, so the text is put together
+    // by hand. The first "?" starts the query.
+    final start = text.indexOf('?') + 1;
+    final end = start + uri.query.length;
+    final query = [
+      for (final pair in uri.query.split('&'))
+        if (_isMaskedPair(pair)) '${pair.substring(0, pair.indexOf('='))}=$appInspectMask' else pair,
+    ].join('&');
+    return '${text.substring(0, start)}$query${text.substring(end)}';
+  }
+
+  /// The path and query for reading, like [AppInspectCall.path], with the
+  /// values of sensitive query parameters masked.
+  String path(AppInspectCall call) {
+    final uri = call.uri;
+    if (!_masksQuery(uri)) return call.path;
+    final pairs = [
+      for (final pair in uri.query.split('&'))
+        if (_isMaskedPair(pair))
+          '${_decodeQuery(pair.substring(0, pair.indexOf('=')))}=$appInspectMask'
+        else
+          _decodeQuery(pair),
+    ];
+    return '${uri.path.isEmpty ? '/' : uri.path}?${pairs.join('&')}';
+  }
+
+  /// Whether [uri] has a query parameter whose value gets masked.
+  bool _masksQuery(Uri uri) => enabled && uri.hasQuery && uri.query.split('&').any(_isMaskedPair);
+
+  bool _isMaskedPair(String pair) {
+    final equals = pair.indexOf('=');
+    return equals > 0 && isMaskedKey(_decodeQuery(pair.substring(0, equals)));
+  }
+
+  static String _decodeQuery(String text) {
+    try {
+      return Uri.decodeQueryComponent(text);
+    } on ArgumentError {
+      return text;
+    }
+  }
+
   /// Masks the values of sensitive keys anywhere in decoded JSON.
   Object? json(Object? value) {
     if (!enabled) return value;
@@ -128,7 +175,7 @@ String encodeBody(Object? decoded, {bool pretty = true}) {
 
 /// A cURL command that repeats [call]. Masked values stay masked.
 String buildCurl(AppInspectCall call, AppInspectMasker masker) {
-  final out = StringBuffer("curl -X ${call.method} '${_quote(call.uri.toString())}'");
+  final out = StringBuffer("curl -X ${call.method} '${_quote(masker.url(call.uri))}'");
   call.requestHeaders.forEach((name, value) {
     out.write(" \\\n  -H '${_quote('$name: ${masker.header(name, value)}')}'");
   });
@@ -216,6 +263,11 @@ List<AppInspectInsight> insightsFor(AppInspectCall call, {required Duration slow
           'Check the internet connection and the base URL. Nothing reached the backend.'),
       'Cancelled' => const AppInspectInsight(
           AppInspectInsightLevel.info, 'Cancelled by the app', 'The app cancelled this request before it finished.'),
+      'Retried' => const AppInspectInsight(
+          AppInspectInsightLevel.warning,
+          'Sent again',
+          'The app sent this request again before this attempt finished, for example after refreshing a token. '
+              'The next call in the list is the new attempt.'),
       _ => AppInspectInsight(
           AppInspectInsightLevel.error, 'Request failed', call.errorDetail ?? call.error ?? 'No details.'),
     });
@@ -239,7 +291,7 @@ List<AppInspectInsight> insightsFor(AppInspectCall call, {required Duration slow
   }
   if (call.bodyTruncated) {
     out.add(const AppInspectInsight(AppInspectInsightLevel.info, 'Body cut short',
-        'The response was longer than the size limit, so only the start is kept.'));
+        'Only the start of the response is kept. It was longer than the size limit, or the app stopped reading it early.'));
   }
   return out;
 }
@@ -251,7 +303,7 @@ String callToMarkdown(AppInspectCall call, AppInspectMasker masker, {required Du
   final responseText = response is String ? response : encodeBody(masker.json(response));
   final parseError = call.parseError;
   return [
-    '**${call.method} ${call.path}** · ${call.statusLabel} · ${formatDuration(call.duration)}',
+    '**${call.method} ${masker.path(call)}** · ${call.statusLabel} · ${formatDuration(call.duration)}',
     'Screen: ${call.visit.name} · ${formatTime(call.startedAt)} · captured by ${call.source}',
     'Issue: ${issues.isEmpty ? 'No issues found' : issues.map((i) => i.title).join(', ')}',
     if (parseError != null) 'Details: ${describeParseError(call, parseError)}',

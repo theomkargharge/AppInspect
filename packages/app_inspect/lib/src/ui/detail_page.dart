@@ -91,7 +91,7 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          call.path,
+                          masker.path(call),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: appInspectMono.copyWith(fontSize: 13.5, fontWeight: FontWeight.w700, color: t.text),
@@ -103,34 +103,37 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
                     ],
                   ),
                 ),
-                // Natural height, but never more than about half the screen,
-                // so the tabs always have room.
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.42),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                // The summary scrolls away and the tabs stay pinned at the
+                // top, so a tab always gets the screen, even in landscape.
+                Expanded(
+                  child: NestedScrollView(
+                    headerSliverBuilder: (context, _) => [
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverList.list(
+                          children: [
+                            _HeroCard(call: call),
+                            for (final insight in insights) InsightCard(insight),
+                          ],
+                        ),
+                      ),
+                      SliverOverlapAbsorber(
+                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+                        sliver: SliverPersistentHeader(
+                          pinned: true,
+                          delegate: _PinnedTabs(controller: _tabs, background: t.canvas),
+                        ),
+                      ),
+                    ],
+                    body: TabBarView(
+                      controller: _tabs,
                       children: [
-                        _HeroCard(call: call),
-                        for (final insight in insights) InsightCard(insight),
+                        _overview(masker),
+                        _requestTab(masker),
+                        _responseTab(masker),
+                        _curlTab(masker),
                       ],
                     ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-                  child: _PillTabs(controller: _tabs),
-                ),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabs,
-                    children: [
-                      _overview(),
-                      _requestTab(masker),
-                      _responseTab(masker),
-                      _curlTab(masker),
-                    ],
                   ),
                 ),
               ],
@@ -150,11 +153,7 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
                 const SizedBox(width: 8),
                 Expanded(
                   child: call.responseBody == null
-                      ? OutlinedButton.icon(
-                          onPressed: null,
-                          icon: const Icon(Icons.data_object_rounded, size: 18),
-                          label: const Text('JSON'),
-                        )
+                      ? const NlBarButton(label: 'JSON', icon: Icons.data_object_rounded, onPressed: null)
                       : NlCopyButton(
                           label: 'JSON',
                           icon: Icons.data_object_rounded,
@@ -163,10 +162,10 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: NlBarButton(
+                    label: 'Share',
+                    icon: Icons.ios_share_rounded,
                     onPressed: () => showCallActions(context, call),
-                    icon: const Icon(Icons.ios_share_rounded, size: 18),
-                    label: const Text('Share'),
                   ),
                 ),
               ],
@@ -190,26 +189,31 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
     return decoded is String ? decoded : encodeBody(masker.json(decoded));
   }
 
-  /// Every tab scrolls under the floating bar, so they end with room for it.
-  Widget _tab(List<Widget> slivers) => CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            sliver: SliverMainAxisGroup(slivers: slivers),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 140)),
-        ],
+  /// Every tab starts below the pinned tabs and scrolls under the floating
+  /// bar, so it ends with room for it.
+  Widget _tab(List<Widget> slivers) => Builder(
+        builder: (context) => CustomScrollView(
+          slivers: [
+            SliverOverlapInjector(handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context)),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              sliver: SliverMainAxisGroup(slivers: slivers),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 140)),
+          ],
+        ),
       );
 
-  Widget _overview() {
+  Widget _overview(AppInspectMasker masker) {
     final t = AppInspectTokens.of(context);
+    final url = masker.url(call.uri);
     return _tab([
       SliverToBoxAdapter(
         child: FutureBuilder<String>(
           future: _requestSize,
           builder: (context, requestSize) => KeyValueCard(
             [
-              ('URL', call.uri.toString()),
+              ('URL', url),
               ('Method', call.method),
               ('Status', call.statusLabel),
               ('Screen', call.visit.name),
@@ -225,7 +229,7 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
                 tooltip: 'Copy URL',
                 visualDensity: VisualDensity.compact,
                 icon: Icon(Icons.copy_rounded, size: 17, color: t.accent),
-                onPressed: () => copyText(context, call.uri.toString(), 'URL copied'),
+                onPressed: () => copyText(context, url, 'URL copied'),
               ),
             },
           ),
@@ -261,7 +265,11 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
       SliverToBoxAdapter(child: _headers(call.requestHeaders, masker)),
       if (query.isNotEmpty) ...[
         const SliverToBoxAdapter(child: NlSectionLabel('Query parameters')),
-        SliverToBoxAdapter(child: KeyValueCard([for (final e in query.entries) (e.key, e.value.join(', '))])),
+        SliverToBoxAdapter(
+          child: KeyValueCard([
+            for (final e in query.entries) (e.key, masker.isMaskedKey(e.key) ? appInspectMask : e.value.join(', ')),
+          ]),
+        ),
       ],
       const SliverToBoxAdapter(child: NlSectionLabel('Body')),
       _BodySliver(body: call.requestBody, masker: masker),
@@ -270,11 +278,15 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
 
   Widget _responseTab(AppInspectMasker masker) {
     if (call.isPending) {
-      return const NlEmptyState(
-        icon: Icons.hourglass_top_rounded,
-        title: 'Waiting for the response',
-        message: 'It shows up here as soon as the server answers.',
-      );
+      return _tab([
+        const SliverToBoxAdapter(
+          child: NlEmptyState(
+            icon: Icons.hourglass_top_rounded,
+            title: 'Waiting for the response',
+            message: 'It shows up here as soon as the server answers.',
+          ),
+        ),
+      ]);
     }
     // The body is what QC needs, so it comes first. Response headers are
     // often long, so they start folded.
@@ -331,12 +343,15 @@ class _HeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppInspectTokens.of(context);
-    final httpFailed = call.state == AppInspectCallState.failed || (call.statusCode ?? 0) >= 400;
+    // The status itself: a parse error can come with a 201 or a 500.
+    final httpFailed = !call.cancelled && (call.state == AppInspectCallState.failed || (call.statusCode ?? 0) >= 400);
     final (fg, bg, icon) = call.isPending
         ? (t.textSecondary, t.surfaceAlt, Icons.hourglass_top_rounded)
-        : call.isError
-            ? (t.err, t.errSoft, call.parseError != null ? Icons.data_object_rounded : Icons.close_rounded)
-            : (t.ok, t.okSoft, Icons.check_rounded);
+        : call.cancelled
+            ? (t.textSecondary, t.surfaceAlt, Icons.block_rounded)
+            : call.isError
+                ? (t.err, t.errSoft, call.parseError != null ? Icons.data_object_rounded : Icons.close_rounded)
+                : (t.ok, t.okSoft, Icons.check_rounded);
     final flags = flagPills(context, call);
     return NlCard(
       child: Column(
@@ -367,7 +382,7 @@ class _HeroCard extends StatelessWidget {
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.4,
-                        color: call.isPending ? t.textSecondary : (httpFailed ? t.err : t.ok),
+                        color: call.isPending || call.cancelled ? t.textSecondary : (httpFailed ? t.err : t.ok),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -412,8 +427,9 @@ class _TimingBar extends StatelessWidget {
       return Text('Waiting for the response…', style: TextStyle(fontSize: 12.5, color: t.textSecondary));
     }
     final limit = AppInspect.slowThreshold.value;
+    // At least 1 ms, so a zero limit and an instant call don't divide by zero.
     final scaleMs =
-        [limit.inMilliseconds * 2, (duration.inMilliseconds * 1.15).round()].reduce((a, b) => a > b ? a : b);
+        [1, limit.inMilliseconds * 2, (duration.inMilliseconds * 1.15).round()].reduce((a, b) => a > b ? a : b);
     final fraction = (duration.inMilliseconds / scaleMs).clamp(0.02, 1.0);
     final limitAt = limit.inMilliseconds / scaleMs;
     final slow = call.isSlow(limit);
@@ -464,6 +480,35 @@ class _TimingBar extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The tabs, pinned under the page header while the summary scrolls away.
+class _PinnedTabs extends SliverPersistentHeaderDelegate {
+  const _PinnedTabs({required this.controller, required this.background});
+
+  final TabController controller;
+  final Color background;
+
+  // 14 above the tabs, 42 for the tabs and 4 below.
+  static const double _height = 60;
+
+  @override
+  double get minExtent => _height;
+
+  @override
+  double get maxExtent => _height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => ColoredBox(
+        color: background,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+          child: _PillTabs(controller: controller),
+        ),
+      );
+
+  @override
+  bool shouldRebuild(_PinnedTabs old) => old.controller != controller || old.background != background;
 }
 
 /// iOS-style tabs: a white pill slides behind the chosen tab.

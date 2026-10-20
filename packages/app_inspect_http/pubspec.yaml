@@ -1,6 +1,6 @@
 name: app_inspect_http
 description: Captures package:http requests for the AppInspect in-app network inspector.
-version: 0.2.1
+version: 0.2.2
 repository: https://github.com/theomkargharge/NetLense/tree/main/packages/app_inspect_http
 issue_tracker: https://github.com/theomkargharge/NetLense/issues
 topics:
@@ -17,7 +17,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.0
-  app_inspect: ^0.2.0
+  app_inspect: ^0.2.2
 
 dev_dependencies:
   flutter_test:

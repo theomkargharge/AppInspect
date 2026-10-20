@@ -2,7 +2,7 @@ name: app_inspect
 description: >-
   A QC-first network inspector for Flutter. See the API calls of each screen,
   copy them as cURL and share them, right inside the app.
-version: 0.2.1
+version: 0.2.2
 repository: https://github.com/theomkargharge/NetLense/tree/main/packages/app_inspect
 issue_tracker: https://github.com/theomkargharge/NetLense/issues
 topics:
@@ -12,7 +12,7 @@ topics:
   - logging
   - qa
 screenshots:
-  - description: The floating bubble counts this screen's calls and turns red when one fails.
+  - description: The floating bubble counts this screen's API calls and turns red when one fails.
     path: screenshots/bubble.webp
   - description: Calls grouped by screen, with failed, slow and repeated calls flagged.
     path: screenshots/calls.webp
@@ -24,8 +24,6 @@ screenshots:
     path: screenshots/export.webp
   - description: Logs console with debugPrint, print, errors and failed calls, tagged by screen.
     path: screenshots/logs.webp
-  - description: One-tap bug report with a screenshot, this screen's calls and device info.
-    path: screenshots/bug_report.webp
 resolution: workspace
 
 environment:

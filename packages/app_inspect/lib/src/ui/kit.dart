@@ -144,7 +144,10 @@ class NlPill extends StatelessWidget {
             Icon(icon, size: 12, color: foreground),
             const SizedBox(width: 4),
           ],
-          Text(label, style: style),
+          // A long label, such as an error message, ends in an ellipsis
+          // instead of overflowing. Where the width is unbounded, the pill
+          // takes the label's natural width.
+          Flexible(child: Text(label, style: style, maxLines: 1, overflow: TextOverflow.ellipsis)),
         ],
       ),
     );

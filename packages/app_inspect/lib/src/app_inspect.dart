@@ -12,6 +12,7 @@ import 'config.dart';
 import 'models.dart';
 import 'parse_errors.dart';
 import 'platform/platform_info.dart';
+import 'schedule.dart';
 import 'screens.dart';
 import 'store.dart';
 import 'ui/overlay.dart';
@@ -22,8 +23,11 @@ final GlobalKey<NavigatorState> appInspectNavigatorKey = GlobalKey<NavigatorStat
 /// The app without AppInspect on top. Bug-report screenshots are taken from it.
 final GlobalKey appInspectAppKey = GlobalKey(debugLabel: 'AppInspectApp');
 
-/// Set when the inspector should open straight on the bug report.
-bool appInspectReportPending = false;
+/// Names the screen that's showing when it isn't a route, such as a tab, and
+/// returns its visit. With [resume], a screen that shows again, like a tab
+/// you come back to, keeps its earlier calls instead of starting from zero.
+AppInspectVisit? appInspectShowScreen(String name, {AppInspectVisit? resume}) =>
+    AppInspect.isEnabled ? AppInspect._observer.tagScreen(name, resume: resume) : null;
 
 /// Entry point for AppInspect, the QC-first network inspector.
 ///
@@ -63,16 +67,36 @@ abstract final class AppInspect {
   static bool _backHandlerInstalled = false;
   static _LogHooks? _hooks;
   static bool _inFlutterError = false;
+  static AppInspectConfig? _wrapped;
 
   /// Lines debugPrint is about to print. debugPrint prints through `print`,
   /// so the zone skips these instead of logging them twice.
   static final ListQueue<String> _debugPrinted = ListQueue<String>();
 
-  static void _rememberPrinted(String message) {
-    for (final line in message.split('\n')) {
+  /// Remembers the lines debugPrint will hand to `print`. With a wrap width,
+  /// such as for Flutter's error reports, long lines are printed in pieces.
+  static void _rememberPrinted(String message, int? wrapWidth) {
+    void remember(String line) {
       _debugPrinted.addLast(line);
-      if (_debugPrinted.length > 200) _debugPrinted.removeFirst();
+      if (_debugPrinted.length > 1000) _debugPrinted.removeFirst();
     }
+
+    for (final line in message.split('\n')) {
+      if (wrapWidth == null) {
+        remember(line);
+      } else {
+        debugWordWrap(line, wrapWidth).forEach(remember);
+      }
+    }
+  }
+
+  /// Whether every line of [text] is one debugPrint just printed. Throttled
+  /// debugPrint prints line by line, the synchronous one all lines at once.
+  static bool _takePrinted(String text) {
+    final lines = text.split('\n');
+    if (!lines.every(_debugPrinted.contains)) return false;
+    lines.forEach(_debugPrinted.remove);
+    return true;
   }
 
   static AppInspectConfig get config => store.config;
@@ -84,8 +108,16 @@ abstract final class AppInspect {
   static Widget wrap(Widget app, {AppInspectConfig config = const AppInspectConfig()}) {
     if (!isEnabled) return app;
     store.config = config;
-    darkTheme.value = config.darkTheme;
-    slowThreshold.value = config.slowThreshold;
+    // A rebuild that wraps the app again keeps what people picked in
+    // Settings. Only a new starting value in the config changes it.
+    final previous = _wrapped;
+    _wrapped = config;
+    if (previous == null || previous.darkTheme != config.darkTheme) {
+      runWhenSafe(() => darkTheme.value = config.darkTheme);
+    }
+    if (previous == null || previous.slowThreshold != config.slowThreshold) {
+      runWhenSafe(() => slowThreshold.value = config.slowThreshold);
+    }
     _installBackHandler();
     // flutter test checks that debugPrint and the error handlers are left
     // alone, so AppInspect doesn't hook them there.
@@ -108,7 +140,7 @@ abstract final class AppInspect {
       body,
       zoneSpecification: zones.ZoneSpecification(
         print: (self, parent, zone, line) {
-          if (!_debugPrinted.remove(line)) store.addLog(AppInspectLogLevel.info, line, source: 'print');
+          if (!_takePrinted(line)) store.addLog(AppInspectLogLevel.info, line, source: 'print');
           parent.print(zone, line);
         },
       ),
@@ -211,27 +243,25 @@ abstract final class AppInspect {
   }
 
   /// Opens the inspector on the current screen's calls.
+  ///
+  /// Safe to call at any time. Called while Flutter builds a frame, it opens
+  /// right after that frame.
   static void open() {
     if (!isEnabled) return;
-    store.markErrorsSeen();
-    isOpen.value = true;
+    runWhenSafe(() {
+      store.markErrorsSeen();
+      isOpen.value = true;
+    });
   }
 
-  /// Opens the bug report for the current screen. Holding the bubble does this.
-  static void openReport() {
-    if (!isEnabled) return;
-    appInspectReportPending = true;
-    if (isOpen.value) {
-      // The open inspector picks it up on its next frame.
-      store.refresh();
-    } else {
-      open();
-    }
-  }
+  /// Bug reports are turned off for now, so this opens the inspector.
+  @Deprecated('Bug reports are turned off for now. This opens the inspector, like open().')
+  static void openReport() => open();
 
+  /// Closes the inspector. Safe to call at any time, like [open].
   static void close() {
     if (!isEnabled) return;
-    isOpen.value = false;
+    runWhenSafe(() => isOpen.value = false);
   }
 
   /// False until the right PIN is entered, when `AppInspectConfig.pin` is set.
@@ -286,7 +316,7 @@ abstract final class AppInspect {
         // Flutter prints each error through debugPrint too. That error is
         // already logged once, so skip the copy.
         if (!_inFlutterError) store.addLog(AppInspectLogLevel.info, message, source: 'debugPrint');
-        _rememberPrinted(message);
+        _rememberPrinted(message, wrapWidth);
       }
       hooks.debugPrint(message, wrapWidth: wrapWidth);
     };
@@ -294,8 +324,12 @@ abstract final class AppInspect {
     FlutterError.onError = (details) {
       _inFlutterError = true;
       try {
-        store.addLog(AppInspectLogLevel.error, details.exceptionAsString(),
-            source: 'Flutter error', details: details.stack?.toString());
+        try {
+          store.addLog(AppInspectLogLevel.error, details.exceptionAsString(),
+              source: 'Flutter error', details: details.stack?.toString());
+        } catch (_) {
+          // Logging must never stop the app's own error handler below.
+        }
         hooks.flutterError?.call(details);
       } finally {
         _inFlutterError = false;
@@ -303,7 +337,11 @@ abstract final class AppInspect {
     };
 
     dispatcher.onError = (error, stack) {
-      store.addLog(AppInspectLogLevel.error, '$error', source: 'Uncaught error', details: stack.toString());
+      try {
+        store.addLog(AppInspectLogLevel.error, '$error', source: 'Uncaught error', details: stack.toString());
+      } catch (_) {
+        // Same here: the app's handler still runs.
+      }
       return hooks.platformError?.call(error, stack) ?? false;
     };
   }
@@ -345,6 +383,7 @@ Map<String, String> appInspectReportInfo() {
       info['Device'] = platform;
     }
     info['Locale'] = dispatcher.locale.toLanguageTag();
+    // ignore: deprecated_member_use_from_same_package
     info.addAll(AppInspect.config.reportInfo?.call() ?? const {});
   } catch (_) {
     // Whatever was gathered before the failure still helps.

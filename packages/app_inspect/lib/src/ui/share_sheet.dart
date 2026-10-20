@@ -11,13 +11,21 @@ import 'widgets.dart';
 
 String _slug(String s) => s.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_').replaceAll(RegExp(r'^_+|_+$'), '').toLowerCase();
 
+/// [name] as a safe file name, keeping its case: `HomeScreen` stays as it is,
+/// and a route name such as `/product/42` becomes `product_42`.
+String _fileName(String name) {
+  final safe = name.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_').replaceAll(RegExp(r'^[_.]+|_+$'), '');
+  return safe.isEmpty ? 'calls' : safe;
+}
+
 /// Share and export options for one call: Markdown for chat, HAR for
 /// browser tools, Postman for the backend team, and cURL.
 Future<void> showCallActions(BuildContext context, AppInspectCall call) {
   final masker = currentMasker();
   final screen = call.visit.name;
   final screenCalls = AppInspect.store.callsFor(call.visit).where((c) => !c.isPending).toList();
-  final title = '${call.method} ${call.path}';
+  final path = masker.path(call);
+  final title = '${call.method} $path';
   final slug = _slug('${call.method} ${call.uri.path}');
   return showModalBottomSheet<void>(
     context: context,
@@ -50,7 +58,7 @@ Future<void> showCallActions(BuildContext context, AppInspectCall call) {
                       NlMethodPill(call.method),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(call.path,
+                        child: Text(path,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: appInspectMono.copyWith(color: t.textSecondary)),
@@ -93,7 +101,8 @@ Future<void> showCallActions(BuildContext context, AppInspectCall call) {
                   onTap: () => pick(AppInspectShareItem(
                     text: buildHar(screenCalls, masker),
                     subject: 'Calls on $screen',
-                    fileName: '$screen.har',
+                    // Route names such as /product/42 aren't file names.
+                    fileName: '${_fileName(screen)}.har',
                     mimeType: 'application/json',
                   )),
                 ),

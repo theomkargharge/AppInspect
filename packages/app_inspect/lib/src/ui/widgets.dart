@@ -12,11 +12,19 @@ import 'theme.dart';
 /// The masker for what's on screen right now, following the Settings switch.
 AppInspectMasker currentMasker() => AppInspectMasker(AppInspect.config, enabled: AppInspect.maskData.value);
 
-/// Copies [text] and confirms with a toast and a light haptic.
-Future<void> copyText(BuildContext context, String text, String message) async {
-  await Clipboard.setData(ClipboardData(text: text));
+/// Copies [text] and confirms with a toast and a light haptic. Returns
+/// whether it was copied.
+Future<bool> copyText(BuildContext context, String text, String message) async {
+  try {
+    await Clipboard.setData(ClipboardData(text: text));
+  } catch (e) {
+    // Some platforms, such as a browser without clipboard access, refuse.
+    if (context.mounted) showNlToast(context, 'Couldn\'t copy: $e', icon: Icons.error_rounded);
+    return false;
+  }
   await HapticFeedback.lightImpact();
   if (context.mounted) showNlToast(context, message);
+  return true;
 }
 
 /// Uses `AppInspectConfig.onShare` when the app set one, and the clipboard
@@ -64,6 +72,10 @@ class NlStatusPill extends StatelessWidget {
     if (call.isPending) {
       return NlPill(
           label: 'Pending', foreground: t.textSecondary, background: t.surfaceAlt, icon: Icons.more_horiz_rounded);
+    }
+    if (call.cancelled) {
+      return NlPill(
+          label: call.statusLabel, foreground: t.textSecondary, background: t.surfaceAlt, icon: Icons.block_rounded);
     }
     final failed = call.state == AppInspectCallState.failed || (call.statusCode ?? 0) >= 400;
     return NlPill(
