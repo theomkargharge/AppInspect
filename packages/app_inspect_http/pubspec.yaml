@@ -1,8 +1,8 @@
 name: app_inspect_http
 description: Captures package:http requests for the AppInspect in-app network inspector.
 version: 0.2.2
-repository: https://github.com/theomkargharge/NetLense/tree/main/packages/app_inspect_http
-issue_tracker: https://github.com/theomkargharge/NetLense/issues
+repository: https://github.com/theomkargharge/AppInspect/tree/main/packages/app_inspect_http
+issue_tracker: https://github.com/theomkargharge/AppInspect/issues
 topics:
   - http
   - network

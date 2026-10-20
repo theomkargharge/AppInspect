@@ -5,9 +5,9 @@ A network inspector for Flutter that QC can use on their own.
 Tap the floating bubble and AppInspect shows the API calls of the screen you're on: the URL, status in plain words, time, size, headers and the raw response. Copy any call as cURL for the backend team, or export it as HAR or Postman. No cable, no debug console, no "sit beside me".
 
 <p>
-  <img src="https://raw.githubusercontent.com/theomkargharge/NetLense/main/packages/app_inspect/screenshots/calls.webp" width="240" alt="Calls grouped by screen, with failed, slow and repeated calls flagged">
-  <img src="https://raw.githubusercontent.com/theomkargharge/NetLense/main/packages/app_inspect/screenshots/parse_error.webp" width="240" alt="A parse error that names the exact field the app couldn't read">
-  <img src="https://raw.githubusercontent.com/theomkargharge/NetLense/main/packages/app_inspect/screenshots/logs.webp" width="240" alt="Logs console tagged by screen">
+  <img src="https://raw.githubusercontent.com/theomkargharge/AppInspect/main/packages/app_inspect/screenshots/calls.webp" width="240" alt="Calls grouped by screen, with failed, slow and repeated calls flagged">
+  <img src="https://raw.githubusercontent.com/theomkargharge/AppInspect/main/packages/app_inspect/screenshots/parse_error.webp" width="240" alt="A parse error that names the exact field the app couldn't read">
+  <img src="https://raw.githubusercontent.com/theomkargharge/AppInspect/main/packages/app_inspect/screenshots/logs.webp" width="240" alt="Logs console tagged by screen">
 </p>
 
 ## What it does

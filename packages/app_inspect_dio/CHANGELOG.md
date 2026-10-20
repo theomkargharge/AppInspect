@@ -1,5 +1,6 @@
 ## 0.2.2
 
+* The repository moved to https://github.com/theomkargharge/AppInspect.
 * Fixed: a request the app cancelled, such as a search that was typed over, counted as a failure and turned the bubble red. It now shows as `Cancelled`.
 * Fixed: when an interceptor before AppInspect sent a request again, such as after a token refresh, the first attempt stayed pending forever. It now shows as `Retried`, followed by the new call.
 * Needs app_inspect 0.2.2.
