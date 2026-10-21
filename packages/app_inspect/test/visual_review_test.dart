@@ -129,4 +129,54 @@ void main() {
       await tester.pumpAndSettle();
     }, skip: shotsDir.isEmpty);
   }
+
+  // The inspector in the colors of different apps.
+  final appThemes = {
+    'orange': ThemeData(colorSchemeSeed: const Color(0xFFE2582B)),
+    'teal_dark': ThemeData(colorSchemeSeed: Colors.teal, brightness: Brightness.dark),
+    'material2_blue': ThemeData(useMaterial3: false, primarySwatch: Colors.blue),
+    'red_cream': ThemeData(
+      colorScheme: const ColorScheme.light(primary: Color(0xFFD32F2F), secondary: Color(0xFF6D4C41)),
+      scaffoldBackgroundColor: const Color(0xFFF7F1E8),
+    ),
+  };
+  for (final MapEntry(key: name, value: theme) in appThemes.entries) {
+    testWidgets('screens in the $name app theme', (tester) async {
+      setScreen(tester, sizes['phone']!.$1, ratio: 1);
+      mockClipboard(tester);
+      await tester.pumpWidget(RepaintBoundary(key: _screen, child: testApp(const HomeScreen(), theme: theme)));
+      await tester.pumpAndSettle();
+      seedRealisticCalls();
+      seedRealisticLogs();
+      await tester.pumpAndSettle();
+      await shot(tester, 'theme_${name}_1_bubble');
+
+      AppInspect.open();
+      await tester.pumpAndSettle();
+      await shot(tester, 'theme_${name}_2_list');
+      await tester.enterText(find.byType(TextField).first, 'carts');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byWidgetPredicate((w) => w is Text && (w.data ?? '').contains('/carts/add')).first);
+      await tester.pumpAndSettle();
+      await shot(tester, 'theme_${name}_3_detail');
+      await tester.tap(find.text('Response'));
+      await tester.pumpAndSettle();
+      await shot(tester, 'theme_${name}_4_response');
+      await pressBack(tester);
+      await tester.enterText(find.byType(TextField).first, '');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+      await shot(tester, 'theme_${name}_5_settings');
+      await pressBack(tester);
+
+      await tester.tap(find.byKey(const ValueKey('app_inspect_tab_logs')));
+      await tester.pumpAndSettle();
+      await shot(tester, 'theme_${name}_6_logs');
+      AppInspect.close();
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+    }, skip: shotsDir.isEmpty);
+  }
 }

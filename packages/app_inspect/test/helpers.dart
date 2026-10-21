@@ -36,8 +36,8 @@ void setScreen(WidgetTester tester, Size size, {double textScale = 1, double rat
 }
 
 /// The app under test: AppInspect around a MaterialApp.
-Widget testApp(Widget home, {AppInspectConfig config = const AppInspectConfig()}) => AppInspect.wrap(
-      MaterialApp(navigatorObservers: [AppInspect.navigatorObserver], home: home),
+Widget testApp(Widget home, {AppInspectConfig config = const AppInspectConfig(), ThemeData? theme}) => AppInspect.wrap(
+      MaterialApp(navigatorObservers: [AppInspect.navigatorObserver], theme: theme, home: home),
       config: config,
     );
 
@@ -59,7 +59,7 @@ void resetAppInspect() {
     ..clear()
     ..clearLogs();
   AppInspect.maskData.value = true;
-  AppInspect.darkTheme.value = false;
+  AppInspect.themeMode.value = AppInspectThemeMode.app;
   AppInspect.slowThreshold.value = const Duration(seconds: 1);
 }
 

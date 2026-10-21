@@ -181,8 +181,8 @@ class _JsonSliverState extends State<JsonSliver> {
                 ),
                 NlActionTile(
                   icon: Icons.alt_route_rounded,
-                  color: t.violet,
-                  background: t.violetSoft,
+                  color: t.accentAlt,
+                  background: t.accentAltSoft,
                   title: 'Copy path',
                   subtitle: shownPath,
                   onTap: () {

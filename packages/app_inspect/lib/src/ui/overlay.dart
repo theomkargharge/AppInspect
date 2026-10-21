@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../models.dart';
 import '../app_inspect.dart';
 import '../schedule.dart';
+import 'app_theme.dart';
 import 'bubble.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
@@ -17,7 +18,8 @@ import 'theme.dart';
 /// Sits above the app: the app itself, the bubble, and the inspector.
 ///
 /// The inspector brings its own theme, localizations and navigator, so it
-/// never touches the app's route stack, theme or analytics.
+/// never touches the app's route stack, theme or analytics. Its theme takes
+/// the app's colors unless people pick AppInspect's light or dark one.
 class AppInspectOverlay extends StatelessWidget {
   const AppInspectOverlay({super.key, required this.child});
 
@@ -135,10 +137,12 @@ class _AppInspectInspectorState extends State<AppInspectInspector> {
   Widget build(BuildContext context) {
     // Everything, the PIN screen included, lives inside the navigator, which
     // gives text fields, tooltips and toasts the overlay they need.
-    return ValueListenableBuilder<bool>(
-      valueListenable: AppInspect.darkTheme,
-      builder: (context, dark, _) {
-        final theme = buildAppInspectTheme(dark: dark);
+    return ListenableBuilder(
+      listenable: appInspectLookChanges,
+      builder: (context, _) {
+        final look = currentAppInspectLook();
+        final theme = buildAppInspectTheme(look.tokens, scheme: look.scheme);
+        final dark = look.tokens.brightness == Brightness.dark;
         // The inspector is dense, so it follows the system text size up to
         // 1.3x, about the largest standard setting, and stays usable on small
         // phones beyond that.

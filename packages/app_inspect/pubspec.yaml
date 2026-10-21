@@ -2,7 +2,7 @@ name: app_inspect
 description: >-
   A QC-first network inspector for Flutter. See the API calls of each screen,
   copy them as cURL and share them, right inside the app.
-version: 0.2.2
+version: 0.2.3
 repository: https://github.com/theomkargharge/AppInspect/tree/main/packages/app_inspect
 issue_tracker: https://github.com/theomkargharge/AppInspect/issues
 topics:

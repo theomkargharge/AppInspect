@@ -15,6 +15,7 @@ import 'platform/platform_info.dart';
 import 'schedule.dart';
 import 'screens.dart';
 import 'store.dart';
+import 'ui/app_theme.dart';
 import 'ui/overlay.dart';
 
 /// The navigator for the inspector's own pages. Never the app's navigator.
@@ -57,8 +58,15 @@ abstract final class AppInspect {
   /// Mask sensitive headers and keys. People can turn this off in Settings.
   static final ValueNotifier<bool> maskData = ValueNotifier<bool>(true);
 
-  /// The inspector's own theme, separate from the app's.
-  static final ValueNotifier<bool> darkTheme = ValueNotifier<bool>(false);
+  /// The theme of the inspector and the bubble: the app's own, or
+  /// AppInspect's light or dark one. People can change it in Settings.
+  static final ValueNotifier<AppInspectThemeMode> themeMode =
+      ValueNotifier<AppInspectThemeMode>(AppInspectThemeMode.app);
+
+  /// Whether the inspector uses its own dark theme. Setting it picks
+  /// AppInspect's dark or light theme.
+  @Deprecated('Use themeMode.')
+  static final ValueNotifier<bool> darkTheme = _DarkThemeSwitch(themeMode);
 
   /// Calls slower than this are flagged. People can change it in Settings.
   static final ValueNotifier<Duration> slowThreshold = ValueNotifier<Duration>(const Duration(seconds: 1));
@@ -112,18 +120,24 @@ abstract final class AppInspect {
     // Settings. Only a new starting value in the config changes it.
     final previous = _wrapped;
     _wrapped = config;
-    if (previous == null || previous.darkTheme != config.darkTheme) {
-      runWhenSafe(() => darkTheme.value = config.darkTheme);
+    final startTheme = _startTheme(config);
+    if (previous == null || _startTheme(previous) != startTheme) {
+      runWhenSafe(() => themeMode.value = startTheme);
     }
     if (previous == null || previous.slowThreshold != config.slowThreshold) {
       runWhenSafe(() => slowThreshold.value = config.slowThreshold);
     }
     _installBackHandler();
+    AppInspectAppTheme.install();
     // flutter test checks that debugPrint and the error handlers are left
     // alone, so AppInspect doesn't hook them there.
     if (config.captureLogs && !isFlutterTest) _installLogHooks();
     return AppInspectOverlay(child: app);
   }
+
+  static AppInspectThemeMode _startTheme(AppInspectConfig config) =>
+      // ignore: deprecated_member_use_from_same_package
+      config.darkTheme ? AppInspectThemeMode.dark : config.themeMode;
 
   /// Runs [body], usually your `runApp` call, in a zone that also sends
   /// `print` output to the logs console.
@@ -389,6 +403,37 @@ Map<String, String> appInspectReportInfo() {
     // Whatever was gathered before the failure still helps.
   }
   return info;
+}
+
+/// `AppInspect.darkTheme`, kept for apps that use it. It reads and sets
+/// `AppInspect.themeMode`.
+class _DarkThemeSwitch extends ChangeNotifier implements ValueNotifier<bool> {
+  _DarkThemeSwitch(this._mode) : _last = _mode.value == AppInspectThemeMode.dark {
+    _mode.addListener(_changed);
+  }
+
+  final ValueNotifier<AppInspectThemeMode> _mode;
+  bool _last;
+
+  void _changed() {
+    if (value == _last) return;
+    _last = value;
+    notifyListeners();
+  }
+
+  @override
+  bool get value => _mode.value == AppInspectThemeMode.dark;
+
+  /// True picks the dark theme. False picks the light one, from the dark one
+  /// only, so the app's theme stays when it isn't dark.
+  @override
+  set value(bool dark) {
+    if (dark) {
+      _mode.value = AppInspectThemeMode.dark;
+    } else if (_mode.value == AppInspectThemeMode.dark) {
+      _mode.value = AppInspectThemeMode.light;
+    }
+  }
 }
 
 class _LogHooks {

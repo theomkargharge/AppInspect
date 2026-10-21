@@ -2,6 +2,19 @@ import 'package:flutter/foundation.dart';
 
 import 'sharing.dart';
 
+/// Which theme the inspector and the bubble use.
+enum AppInspectThemeMode {
+  /// The app's own theme: its colors, and light or dark like the app. When the
+  /// app's theme changes, such as to dark mode, AppInspect changes with it.
+  app,
+
+  /// AppInspect's own light theme.
+  light,
+
+  /// AppInspect's own dark theme.
+  dark,
+}
+
 /// Settings for AppInspect. Pass them to `AppInspect.wrap`.
 @immutable
 class AppInspectConfig {
@@ -19,7 +32,8 @@ class AppInspectConfig {
     this.onShare,
     @Deprecated('Bug reports are turned off for now, so this is never called.') this.onReport,
     @Deprecated('Bug reports are turned off for now, so this is never called.') this.reportInfo,
-    this.darkTheme = false,
+    this.themeMode = AppInspectThemeMode.app,
+    @Deprecated('Use themeMode: AppInspectThemeMode.dark.') this.darkTheme = false,
   });
 
   /// How many calls to keep. Older calls are dropped first.
@@ -71,8 +85,12 @@ class AppInspectConfig {
   /// Share handler. See [AppInspectShareCallback].
   final AppInspectShareCallback? onShare;
 
-  /// Start the inspector in its dark theme instead of the light one. People
-  /// can switch it in Settings.
+  /// The theme the inspector and the bubble start in. By default they follow
+  /// the app's theme. People can switch it in Settings.
+  final AppInspectThemeMode themeMode;
+
+  /// Start the inspector in its dark theme. Overrides [themeMode] when true.
+  @Deprecated('Use themeMode: AppInspectThemeMode.dark.')
   final bool darkTheme;
 
   static const Set<String> defaultMaskedHeaders = {

@@ -244,7 +244,23 @@ void main() {
     mockClipboard(tester);
     final log = ErrorLog();
     try {
-      await tester.pumpWidget(testApp(const HomeScreen(), config: const AppInspectConfig(darkTheme: true)));
+      await tester
+          .pumpWidget(testApp(const HomeScreen(), config: const AppInspectConfig(themeMode: AppInspectThemeMode.dark)));
+      await tester.pumpAndSettle();
+      await walkThrough(tester, log);
+    } finally {
+      log.restore();
+    }
+    expect(log.errors, isEmpty);
+  });
+
+  testWidgets('no layout errors in a dark app theme on a small phone', (tester) async {
+    setScreen(tester, screens['iPhone SE (1st gen)']!, textScale: 1.3);
+    mockClipboard(tester);
+    final log = ErrorLog();
+    try {
+      await tester.pumpWidget(testApp(const HomeScreen(),
+          theme: ThemeData(colorSchemeSeed: const Color(0xFF0F9D58), brightness: Brightness.dark)));
       await tester.pumpAndSettle();
       await walkThrough(tester, log);
     } finally {

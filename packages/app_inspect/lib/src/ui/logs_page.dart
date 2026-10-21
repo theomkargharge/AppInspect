@@ -68,11 +68,13 @@ class _LogsPageState extends State<LogsPage> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: t.violet,
+                            color: t.accentAlt,
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                  color: t.violet.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4)),
+                                  color: t.accentAlt.withValues(alpha: 0.35),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4)),
                             ],
                           ),
                           child: Icon(Icons.notes_rounded, color: t.onAccent, size: 22),

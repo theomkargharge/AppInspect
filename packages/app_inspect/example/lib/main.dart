@@ -6,6 +6,8 @@ import 'package:app_inspect/app_inspect.dart';
 import 'package:app_inspect_dio/app_inspect_dio.dart';
 import 'package:app_inspect_http/app_inspect_http.dart';
 
+import 'theme_picker.dart';
+
 // The demo talks to dummyjson.com, a free fake REST API.
 final Dio dio = Dio(BaseOptions(
   baseUrl: 'https://dummyjson.com',
@@ -59,12 +61,19 @@ class ShopApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'AppInspect demo',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: const Color(0xFFE2582B), useMaterial3: true),
-      navigatorObservers: [AppInspect.navigatorObserver],
-      home: const HomeScreen(),
+    // Pick another theme with the palette button. AppInspect takes the app's
+    // colors, and follows it into dark mode and back.
+    return ListenableBuilder(
+      listenable: Listenable.merge([demoTheme, demoThemeMode]),
+      builder: (context, _) => MaterialApp(
+        title: 'AppInspect demo',
+        debugShowCheckedModeBanner: false,
+        theme: demoTheme.value.build(Brightness.light),
+        darkTheme: demoTheme.value.build(Brightness.dark),
+        themeMode: demoThemeMode.value,
+        navigatorObservers: [AppInspect.navigatorObserver],
+        home: const HomeScreen(),
+      ),
     );
   }
 }
@@ -141,7 +150,7 @@ class _ShopTabState extends State<ShopTab> {
   Widget build(BuildContext context) {
     final products = _products;
     return Scaffold(
-      appBar: AppBar(title: const Text('Kartly')),
+      appBar: AppBar(title: const Text('Kartly'), actions: const [ThemePickerButton()]),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -315,7 +324,7 @@ class _AccountTabState extends State<AccountTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
+      appBar: AppBar(title: const Text('Account'), actions: const [ThemePickerButton()]),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

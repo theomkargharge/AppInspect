@@ -93,8 +93,8 @@ Future<void> showCallActions(BuildContext context, AppInspectCall call) {
                 ),
                 NlActionTile(
                   icon: Icons.folder_copy_rounded,
-                  color: t.violet,
-                  background: t.violetSoft,
+                  color: t.accentAlt,
+                  background: t.accentAltSoft,
                   title: 'Export HAR: all ${screenCalls.length} calls on $screen',
                   subtitle: 'Every finished call on this screen',
                   enabled: screenCalls.isNotEmpty,

@@ -124,13 +124,13 @@ void main() {
     await tester.pumpWidget(testApp(const HomeScreen()));
     await tester.pumpAndSettle();
     // Picked in Settings.
-    AppInspect.darkTheme.value = true;
+    AppInspect.themeMode.value = AppInspectThemeMode.dark;
     AppInspect.slowThreshold.value = const Duration(seconds: 3);
 
     // The app rebuilds and wraps itself again with the same config.
     await tester.pumpWidget(testApp(const HomeScreen()));
     await tester.pumpAndSettle();
-    expect(AppInspect.darkTheme.value, isTrue);
+    expect(AppInspect.themeMode.value, AppInspectThemeMode.dark);
     expect(AppInspect.slowThreshold.value, const Duration(seconds: 3));
 
     // A new starting value in the config still applies.
@@ -138,7 +138,7 @@ void main() {
         testApp(const HomeScreen(), config: const AppInspectConfig(slowThreshold: Duration(milliseconds: 800))));
     await tester.pumpAndSettle();
     expect(AppInspect.slowThreshold.value, const Duration(milliseconds: 800));
-    expect(AppInspect.darkTheme.value, isTrue);
+    expect(AppInspect.themeMode.value, AppInspectThemeMode.dark);
   });
 
   testWidgets('copying JSON on a 360-wide phone shows "Copied" without overflowing', (tester) async {

@@ -6,13 +6,14 @@ import 'package:flutter/services.dart';
 
 import '../app_inspect.dart';
 import '../schedule.dart';
-import 'theme.dart';
+import 'app_theme.dart';
 
 /// The floating button over the app.
 ///
 /// Tap it to open AppInspect, and drag it anywhere: it springs to the nearest
 /// edge when you let go. Its badge counts the API calls on the current screen.
 /// It turns red when something fails, and pulses once for each new failure.
+/// It takes the inspector's theme, so by default the app's colors.
 class AppInspectBubble extends StatefulWidget {
   const AppInspectBubble({super.key});
 
@@ -153,7 +154,7 @@ class _BubbleFace extends StatefulWidget {
 
 class _BubbleFaceState extends State<_BubbleFace> {
   late final Listenable _changes =
-      Listenable.merge([AppInspect.store, AppInspect.store.unseenErrors, AppInspect.darkTheme]);
+      Listenable.merge([AppInspect.store, AppInspect.store.unseenErrors, appInspectLookChanges]);
 
   @override
   void initState() {
@@ -176,11 +177,14 @@ class _BubbleFaceState extends State<_BubbleFace> {
   @override
   Widget build(BuildContext context) {
     final store = AppInspect.store;
-    final t = AppInspect.darkTheme.value ? AppInspectTokens.dark : AppInspectTokens.light;
+    final t = currentAppInspectLook().tokens;
     final errors = store.unseenErrors.value;
     final count = store.callsFor(store.currentVisit).length;
     final alert = errors > 0;
     final color = alert ? t.err : t.accent;
+    // In an app whose own color is red, a red ring wouldn't say that
+    // something failed, so the whole bubble turns red instead.
+    final filled = alert && _looksAlike(t.accent, t.err);
     // Always the number of calls on this screen. Red says something failed;
     // "!" says so when this screen hasn't made a call.
     final badge = count > 99 ? '99+' : (count > 0 ? '$count' : (alert ? '!' : null));
@@ -213,12 +217,12 @@ class _BubbleFaceState extends State<_BubbleFace> {
               width: s,
               height: s,
               decoration: BoxDecoration(
-                color: t.surface,
+                color: filled ? t.err : t.surface,
                 shape: BoxShape.circle,
                 border: Border.all(color: color, width: 2.5),
                 boxShadow: t.floatShadow,
               ),
-              child: Icon(Icons.manage_search_rounded, size: 27, color: color),
+              child: Icon(Icons.manage_search_rounded, size: 27, color: filled ? t.onErr : color),
             ),
             if (badge != null)
               Positioned(
@@ -251,7 +255,7 @@ class _BubbleFaceState extends State<_BubbleFace> {
                         fontSize: 11,
                         height: 1.2,
                         fontWeight: FontWeight.w800,
-                        color: t.onAccent,
+                        color: alert ? t.onErr : t.onAccent,
                         decoration: TextDecoration.none,
                       ),
                     ),
@@ -263,6 +267,15 @@ class _BubbleFaceState extends State<_BubbleFace> {
       ),
     );
   }
+}
+
+/// Whether two colors are close enough in hue to pass for each other, such as
+/// an app's red and the red of a failure. Grays never are.
+bool _looksAlike(Color a, Color b) {
+  final x = HSVColor.fromColor(a);
+  final y = HSVColor.fromColor(b);
+  final apart = (x.hue - y.hue).abs();
+  return x.saturation > 0.3 && y.saturation > 0.3 && math.min(apart, 360 - apart) < 25;
 }
 
 /// Three soft rings that grow and fade, once per new failure.

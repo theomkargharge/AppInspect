@@ -1,3 +1,12 @@
+## 0.2.3
+
+* New: the inspector and the bubble take your app's colors: its primary color, surfaces, text and outlines, light or dark like the app. When the app's theme changes, such as to dark mode, they change with it. There's nothing to set up: AppInspect reads the theme your MaterialApp or CupertinoApp builds. Status colors stay AppInspect's own, so a failure is red in every app.
+* A theme that leaves `colorScheme.primary` at Flutter's default, such as one made with `ColorScheme.fromSwatch()`, usually keeps its brand color in `primaryColor` or the app bar. AppInspect takes it from there.
+* New: `AppInspectConfig.themeMode` and `AppInspect.themeMode`: `AppInspectThemeMode.app`, the default, or AppInspect's own `light` or `dark` theme. Settings has App, Light and Dark.
+* Changed: the inspector starts in the app's theme instead of its own light one. Pass `themeMode: AppInspectThemeMode.light` for the earlier look.
+* In an app whose own color is red, the bubble turns solid red when something fails, since a red ring wouldn't stand out.
+* Deprecated: `AppInspectConfig.darkTheme` and `AppInspect.darkTheme`. Use `themeMode`. Both still work.
+
 ## 0.2.2
 
 * The repository moved to https://github.com/theomkargharge/AppInspect.
