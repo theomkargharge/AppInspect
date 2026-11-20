@@ -1,11 +1,10 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-
 import '../app_inspect.dart';
 import '../config.dart';
 import '../schedule.dart';
+import 'cupertino.dart';
+import 'material.dart';
 import 'theme.dart';
 
 /// The inspector's colors, and the color scheme its Material widgets build on
@@ -87,10 +86,12 @@ abstract final class AppInspectAppTheme {
           return;
         }
       }
-      final data = switch (source.widget) {
+      final widget = source.widget;
+      final Object? data = switch (widget) {
         Theme(:final data) => data,
         CupertinoTheme(:final data) => data,
-        _ => null,
+        // A theme from the material_ui or cupertino_ui package.
+        _ => (widget as dynamic).data,
       };
       // A Cupertino theme without a brightness follows the platform's.
       final platformBrightness = ui.PlatformDispatcher.instance.platformBrightness;
@@ -100,7 +101,9 @@ abstract final class AppInspectAppTheme {
       _publish(switch (data) {
         ThemeData() => (_materialScheme(data), data.scaffoldBackgroundColor),
         CupertinoThemeData() => _cupertinoColors(data, platformBrightness),
-        _ => null,
+        null => null,
+        _ when _isPackageTheme(widget, _materialThemeName) => _packageMaterialColors(data),
+        _ => _packageCupertinoColors(data, platformBrightness),
       });
     } catch (_) {
       // Following the app's theme must never break the app's frame.
@@ -119,6 +122,24 @@ abstract final class AppInspectAppTheme {
     runWhenSafe(() => look.value = next);
   }
 
+  /// The names of the Theme and CupertinoTheme classes. From Flutter 3.47,
+  /// apps can build their theme with the material_ui and cupertino_ui
+  /// packages instead of the framework's libraries. Their classes are other
+  /// classes with the same names and fields, so AppInspect knows them by name
+  /// and reads their colors by name. In a build made with `--obfuscate` the
+  /// names are scrambled, and AppInspect uses its own light theme for them.
+  static const String _materialThemeName = 'Theme';
+  static const String _cupertinoThemeName = 'CupertinoTheme';
+
+  /// Whether [widget] is the Theme or CupertinoTheme of one of those packages.
+  static bool _isPackageTheme(Widget widget, String name) => widget.runtimeType.toString() == name;
+
+  static bool _isMaterialTheme(Widget? widget) =>
+      widget is Theme || (widget != null && _isPackageTheme(widget, _materialThemeName));
+
+  static bool _isCupertinoTheme(Widget widget) =>
+      widget is CupertinoTheme || _isPackageTheme(widget, _cupertinoThemeName);
+
   /// The app's theme: the deepest Theme above its navigator, which is the one
   /// MaterialApp builds, or one the app adds around all its screens. Themes
   /// below the navigator belong to single screens. A CupertinoApp has a
@@ -133,7 +154,8 @@ abstract final class AppInspectAppTheme {
     void visit(Element element, Element? theme) {
       if (done || visited++ >= 3000) return;
       final widget = element.widget;
-      if (widget is Theme || (widget is CupertinoTheme && theme?.widget is! Theme)) {
+      // A Material Theme has a CupertinoTheme below it, built from its colors.
+      if (_isMaterialTheme(widget) || (_isCupertinoTheme(widget) && !_isMaterialTheme(theme?.widget))) {
         theme = element;
         firstTheme ??= element;
       }
@@ -156,10 +178,14 @@ abstract final class AppInspectAppTheme {
   /// Flutter's defaults, such as a theme made with `ColorScheme.fromSwatch()`.
   /// Those themes usually keep the app's color in `primaryColor` or the app
   /// bar's color instead, so AppInspect takes it from there.
-  static ColorScheme _materialScheme(ThemeData theme) {
-    final scheme = theme.colorScheme;
+  static ColorScheme _materialScheme(ThemeData theme) =>
+      _brandScheme(theme.colorScheme, [theme.primaryColor, theme.appBarTheme.backgroundColor]);
+
+  /// [scheme], with its primary color taken from [candidates] when [scheme]
+  /// leaves it at one of Flutter's defaults.
+  static ColorScheme _brandScheme(ColorScheme scheme, List<Color?> candidates) {
     if (!_defaultPrimaries.contains(scheme.primary)) return scheme;
-    for (final color in [theme.primaryColor, theme.appBarTheme.backgroundColor]) {
+    for (final color in candidates) {
       if (color != null && color != scheme.primary && _isBrandColor(color)) {
         final onColor = ThemeData.estimateBrightnessForColor(color) == Brightness.dark
             ? const Color(0xFFFFFFFF)
@@ -188,15 +214,73 @@ abstract final class AppInspectAppTheme {
     return color.a == 1 && hsv.saturation > 0.3 && hsv.value > 0.2;
   }
 
-  static (ColorScheme, Color?) _cupertinoColors(CupertinoThemeData data, Brightness platformBrightness) {
-    final brightness = data.brightness ?? platformBrightness;
-    Color resolve(Color color) =>
-        color is CupertinoDynamicColor ? (brightness == Brightness.dark ? color.darkColor : color.color) : color;
-    final primary = resolve(data.primaryColor);
-    final scheme = ColorScheme.fromSeed(seedColor: primary, brightness: brightness)
-        .copyWith(primary: primary, onPrimary: resolve(data.primaryContrastingColor));
-    return (scheme, resolve(data.scaffoldBackgroundColor));
+  static (ColorScheme, Color?) _cupertinoColors(CupertinoThemeData data, Brightness platformBrightness) =>
+      _cupertinoScheme(
+        brightness: data.brightness ?? platformBrightness,
+        primary: data.primaryColor,
+        onPrimary: data.primaryContrastingColor,
+        background: data.scaffoldBackgroundColor,
+      );
+
+  static (ColorScheme, Color?) _cupertinoScheme({
+    required Brightness brightness,
+    required Color primary,
+    required Color onPrimary,
+    required Color background,
+  }) {
+    final dark = brightness == Brightness.dark;
+    Color resolve(Color color) {
+      if (color is CupertinoDynamicColor) return dark ? color.darkColor : color.color;
+      // cupertino_ui's CupertinoDynamicColor.
+      if (color.runtimeType.toString() == 'CupertinoDynamicColor') {
+        final dynamic dynamicColor = color;
+        return (dark ? dynamicColor.darkColor : dynamicColor.color) as Color;
+      }
+      return color;
+    }
+
+    final seed = resolve(primary);
+    final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: brightness)
+        .copyWith(primary: seed, onPrimary: resolve(onPrimary));
+    return (scheme, resolve(background));
   }
+
+  /// The colors of a ThemeData from the material_ui package, read by name.
+  static (ColorScheme, Color?) _packageMaterialColors(dynamic theme) {
+    final dynamic s = theme.colorScheme;
+    final scheme = ColorScheme(
+      brightness: s.brightness as Brightness,
+      primary: s.primary as Color,
+      onPrimary: s.onPrimary as Color,
+      secondary: s.secondary as Color,
+      onSecondary: s.onSecondary as Color,
+      error: s.error as Color,
+      onError: s.onError as Color,
+      surface: s.surface as Color,
+      onSurface: s.onSurface as Color,
+      onSurfaceVariant: s.onSurfaceVariant as Color,
+      outline: s.outline as Color,
+      outlineVariant: s.outlineVariant as Color,
+      surfaceContainerLowest: s.surfaceContainerLowest as Color,
+      surfaceContainerLow: s.surfaceContainerLow as Color,
+      surfaceContainer: s.surfaceContainer as Color,
+      surfaceContainerHigh: s.surfaceContainerHigh as Color,
+      surfaceContainerHighest: s.surfaceContainerHighest as Color,
+    );
+    return (
+      _brandScheme(scheme, [theme.primaryColor as Color?, theme.appBarTheme.backgroundColor as Color?]),
+      theme.scaffoldBackgroundColor as Color?,
+    );
+  }
+
+  /// The colors of a CupertinoThemeData from the cupertino_ui package, read
+  /// by name.
+  static (ColorScheme, Color?) _packageCupertinoColors(dynamic data, Brightness platformBrightness) => _cupertinoScheme(
+        brightness: data.brightness as Brightness? ?? platformBrightness,
+        primary: data.primaryColor as Color,
+        onPrimary: data.primaryContrastingColor as Color,
+        background: data.scaffoldBackgroundColor as Color,
+      );
 
   /// Forgets the app's theme, for tests that start a new app.
   @visibleForTesting

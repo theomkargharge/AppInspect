@@ -137,6 +137,35 @@ void seedRealisticCalls() {
   for (var i = 0; i < 3; i++) {
     finishedCall('GET', 'https://dummyjson.com/products/category/beauty?limit=4', responseBody: '{"products":[]}');
   }
+  // GraphQL calls share one URL, so they're named after their operation.
+  finishedCall(
+    'POST',
+    'https://api.example.com/graphql',
+    requestHeaders: {'content-type': 'application/json'},
+    requestBody: jsonEncode({
+      'operationName': 'GetCartWithRecommendationsAndPromotions',
+      'query': r'query GetCartWithRecommendationsAndPromotions($id: ID!) { cart(id: $id) { id total items { id '
+          r'price } recommendations(first: 6) { id title } } }',
+      'variables': {'id': 'cart_51', 'token': 'secret-token'},
+    }),
+    responseBody: '{"data":{"cart":null},"errors":[{"message":"Cart cart_51 was not found for this customer account '
+        'or has expired","path":["cart"],"extensions":{"code":"NOT_FOUND"}}]}',
+  );
+  finishedCall(
+    'POST',
+    'https://api.example.com/graphql',
+    requestBody: {'query': 'mutation ApplyPromo { applyPromo(code: "SAVE10") { ok total } }'},
+    responseBody: '{"data":{"applyPromo":{"ok":true,"total":8.99}}}',
+  );
+  finishedCall(
+    'POST',
+    'https://api.example.com/graphql',
+    requestBody: jsonEncode([
+      {'query': '{ me { id name } }'},
+      {'query': 'query Wishlist { wishlist { id } }'},
+    ]),
+    responseBody: '[{"data":{"me":{"id":1,"name":"Emily"}}},{"data":{"wishlist":[]}}]',
+  );
   final timeout = store.startCall(method: 'GET', uri: Uri.parse('https://dummyjson.com/products?delay=3000&limit=1'));
   store.failCall(timeout, error: 'Timeout', detail: 'The request took longer than 0:00:01.000000 to receive data.');
   final custom = store.startCall(method: 'PATCH', uri: Uri.parse('https://api.example.com/v2/profile'));

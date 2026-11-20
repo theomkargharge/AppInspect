@@ -124,6 +124,21 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('app_inspect_tab_logs')));
       await tester.pumpAndSettle();
       await shot(tester, '${name}_8_logs');
+
+      await tester.tap(find.byKey(const ValueKey('app_inspect_tab_timeline')));
+      await tester.pumpAndSettle();
+      await shot(tester, '${name}_9_timeline');
+      await tester.tap(find.byKey(const ValueKey('app_inspect_tab_network')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'GetCart');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('GetCartWithRecommendationsAndPromotions').first);
+      await tester.pumpAndSettle();
+      await shot(tester, '${name}_10_graphql');
+      await tester.tap(find.text('Request'));
+      await tester.pumpAndSettle();
+      await shot(tester, '${name}_11_graphql_request');
+      await pressBack(tester);
       AppInspect.close();
       await tester.pump(const Duration(seconds: 3));
       await tester.pumpAndSettle();

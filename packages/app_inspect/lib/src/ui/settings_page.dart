@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
-
 import '../format.dart';
 import '../app_inspect.dart';
 import '../config.dart';
 import '../version.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'theme.dart';
 
 /// Masking, theme, slow-call limit and storage.

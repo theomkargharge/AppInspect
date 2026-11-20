@@ -1,12 +1,12 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 
 import '../app_inspect.dart';
 import '../schedule.dart';
 import 'app_theme.dart';
+import 'material.dart';
 
 /// The floating button over the app.
 ///

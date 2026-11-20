@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'kit.dart';
+import 'material.dart';
 import 'theme.dart';
 
 /// A segmented control whose white thumb slides to the chosen option.

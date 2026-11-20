@@ -367,4 +367,18 @@ void main() {
     expect(AppInspect.store.unseenErrors.value, 0, reason: 'the bubble stays calm');
     expect(AppInspect.store.logs.where((l) => identical(l.call, call)), isEmpty, reason: 'nothing to warn about');
   });
+
+  test('names a GraphQL call after its operation and fails it on GraphQL errors', () async {
+    final dio = dioWith((_) => json('{"errors":[{"message":"Not allowed","extensions":{"code":"FORBIDDEN"}}]}', 200));
+
+    await dio.post<dynamic>('/graphql', data: {
+      'query': r'mutation AddToCart($id: ID!) { addToCart(id: $id) { id } }',
+      'variables': {'id': 1},
+    });
+
+    final call = AppInspect.store.calls.single;
+    expect(call.graphQL?.label, 'mutation AddToCart');
+    expect(call.graphQLErrors.single.summary, 'Not allowed (FORBIDDEN)');
+    expect(call.isError, isTrue);
+  });
 }

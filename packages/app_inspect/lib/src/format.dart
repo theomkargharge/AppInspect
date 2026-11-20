@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import 'config.dart';
+import 'graphql.dart';
 import 'models.dart';
 
 /// What a masked value looks like on screen and in exports.
@@ -230,6 +231,29 @@ String formatTime(DateTime t) {
   return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
 }
 
+/// What the call list calls [call]: its GraphQL operation, such as
+/// `query GetCart`, or its method and path, such as `GET /products?limit=12`,
+/// with sensitive query values masked.
+String callTitle(AppInspectCall call, AppInspectMasker masker) =>
+    call.graphQL?.label ?? '${call.method} ${masker.path(call)}';
+
+/// The main text of a call in the call list, next to its method or GraphQL
+/// operation pill: the operation's name, such as `GetCart`, or the path.
+String callHeadline(AppInspectCall call, AppInspectMasker masker) {
+  final graphQL = call.graphQL;
+  if (graphQL == null) return masker.path(call);
+  final name = graphQL.name ?? 'Anonymous ${graphQL.type?.name ?? 'operation'}';
+  return graphQL.batchSize > 1 ? '$name +${graphQL.batchSize - 1}' : name;
+}
+
+/// [errors] in a few words, such as `Cart not found (at cart)` or
+/// `Cart not found (at cart) and 2 more`.
+String describeGraphQLErrors(List<AppInspectGraphQLError> errors) => errors.isEmpty
+    ? ''
+    : errors.length == 1
+        ? errors.first.summary
+        : '${errors.first.summary} and ${errors.length - 1} more';
+
 /// How serious an insight is.
 enum AppInspectInsightLevel { error, warning, info }
 
@@ -253,6 +277,20 @@ List<AppInspectInsight> insightsFor(AppInspectCall call, {required Duration slow
       AppInspectInsightLevel.error,
       'The app couldn\'t read this response',
       describeParseError(call, parseError),
+    ));
+  }
+  final graphQLErrors = call.graphQLErrors;
+  if (graphQLErrors.isNotEmpty) {
+    out.add(AppInspectInsight(
+      AppInspectInsightLevel.error,
+      graphQLErrors.length == 1 ? 'The server returned a GraphQL error' : 'The server returned GraphQL errors',
+      [
+        graphQLErrors.length == 1
+            ? 'It answered ${call.statusLabel}, with this error: ${graphQLErrors.first.summary}.'
+            : 'It answered ${call.statusLabel}, with ${graphQLErrors.length} errors. '
+                'The first: ${graphQLErrors.first.summary}.',
+        if (code < 400) 'GraphQL servers answer 200 even when an operation fails, so the status alone looks fine.',
+      ].join(' '),
     ));
   }
   if (call.state == AppInspectCallState.failed && code == 0) {
@@ -302,11 +340,14 @@ String callToMarkdown(AppInspectCall call, AppInspectMasker masker, {required Du
   final response = decodeBody(call.responseBody);
   final responseText = response is String ? response : encodeBody(masker.json(response));
   final parseError = call.parseError;
+  final graphQL = call.graphQL;
   return [
-    '**${call.method} ${masker.path(call)}** · ${call.statusLabel} · ${formatDuration(call.duration)}',
+    '**${callTitle(call, masker)}** · ${call.statusLabel} · ${formatDuration(call.duration)}',
+    if (graphQL != null) 'GraphQL: ${call.method} ${masker.path(call)}',
     'Screen: ${call.visit.name} · ${formatTime(call.startedAt)} · captured by ${call.source}',
     'Issue: ${issues.isEmpty ? 'No issues found' : issues.map((i) => i.title).join(', ')}',
     if (parseError != null) 'Details: ${describeParseError(call, parseError)}',
+    if (call.graphQLErrors.isNotEmpty) 'Errors: ${[for (final e in call.graphQLErrors) e.summary].join('; ')}',
     '',
     '```bash',
     buildCurl(call, masker),

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart' show CupertinoPageTransition, CupertinoRouteTransitionMixin;
-import 'package:flutter/material.dart';
+import 'cupertino.dart';
+import 'material.dart';
 
 /// Colors, shadows and code colors for the inspector: its own light and dark
 /// themes, or ones made from the app's theme. Read them with

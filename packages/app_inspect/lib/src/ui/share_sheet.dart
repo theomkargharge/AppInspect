@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
-
 import '../export.dart';
 import '../format.dart';
 import '../models.dart';
 import '../app_inspect.dart';
 import '../sharing.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -24,9 +23,9 @@ Future<void> showCallActions(BuildContext context, AppInspectCall call) {
   final masker = currentMasker();
   final screen = call.visit.name;
   final screenCalls = AppInspect.store.callsFor(call.visit).where((c) => !c.isPending).toList();
-  final path = masker.path(call);
-  final title = '${call.method} $path';
-  final slug = _slug('${call.method} ${call.uri.path}');
+  final path = callHeadline(call, masker);
+  final title = callTitle(call, masker);
+  final slug = _slug(call.graphQL?.label ?? '${call.method} ${call.uri.path}');
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -55,7 +54,7 @@ Future<void> showCallActions(BuildContext context, AppInspectCall call) {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: Row(
                     children: [
-                      NlMethodPill(call.method),
+                      NlOperationPill(call),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(path,

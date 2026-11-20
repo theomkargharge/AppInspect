@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
@@ -9,11 +7,14 @@ import '../app_inspect.dart';
 import '../schedule.dart';
 import 'app_theme.dart';
 import 'bubble.dart';
+import 'cupertino.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
 import 'list_page.dart';
 import 'logs_page.dart';
+import 'material.dart';
 import 'theme.dart';
+import 'timeline_page.dart';
 
 /// Sits above the app: the app itself, the bubble, and the inspector.
 ///
@@ -221,7 +222,7 @@ class _InspectorTabsState extends State<_InspectorTabs> {
           // Each tab is its own Scaffold and handles the keyboard itself.
           resizeToAvoidBottomInset: false,
           extendBody: true,
-          body: IndexedStack(index: _tab, children: const [CallListPage(), LogsPage()]),
+          body: IndexedStack(index: _tab, children: const [CallListPage(), LogsPage(), TimelinePage()]),
           bottomNavigationBar: NlNavBar(
             index: _tab,
             onChanged: (i) => setState(() => _tab = i),
@@ -229,6 +230,8 @@ class _InspectorTabsState extends State<_InspectorTabs> {
               const NlNavItem(icon: Icons.sync_alt_rounded, label: 'Network', key: ValueKey('app_inspect_tab_network')),
               NlNavItem(
                   icon: Icons.notes_rounded, label: 'Logs', badge: errors, key: const ValueKey('app_inspect_tab_logs')),
+              const NlNavItem(
+                  icon: Icons.timeline_rounded, label: 'Timeline', key: ValueKey('app_inspect_tab_timeline')),
             ],
           ),
         );

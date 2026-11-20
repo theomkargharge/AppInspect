@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
-
 import '../format.dart';
 import '../models.dart';
 import '../app_inspect.dart';
 import 'detail_page.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
