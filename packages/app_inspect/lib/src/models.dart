@@ -1,3 +1,5 @@
+import 'graphql.dart';
+
 /// One stay on a screen. Every call is tagged with the visit that made it.
 class AppInspectVisit {
   AppInspectVisit({required this.id, required String name, required this.startedAt}) : _name = name;
@@ -14,6 +16,19 @@ class AppInspectVisit {
 
   @override
   String toString() => 'AppInspectVisit($id, $name)';
+}
+
+/// A move to a screen: a new visit, or back to an earlier one. The session
+/// timeline shows them between the calls and the logs.
+class AppInspectScreenChange {
+  const AppInspectScreenChange({required this.visit, required this.time, this.returned = false});
+
+  final AppInspectVisit visit;
+  final DateTime time;
+
+  /// True when the app went back to [visit], such as after a screen on top
+  /// of it closed, or a tab it had shown before.
+  final bool returned;
 }
 
 /// Where a call is in its life.
@@ -82,14 +97,28 @@ class AppInspectCall {
   /// answered. This is the classic "it works on my side" bug.
   AppInspectParseError? parseError;
 
+  /// The GraphQL operation this call sends, such as `query GetCart`, or null
+  /// when it isn't a GraphQL call. Read from the request the first time it's
+  /// needed.
+  late final AppInspectGraphQL? graphQL =
+      AppInspectGraphQL.fromRequest(method: method, uri: uri, headers: requestHeaders, body: requestBody);
+
+  /// Errors a GraphQL server returned in its response. Servers usually send
+  /// them with `200 OK`, so AppInspect reads the response to find them. They
+  /// make the call a failure.
+  List<AppInspectGraphQLError> graphQLErrors = const [];
+
   Duration? get duration => endedAt?.difference(startedAt);
   bool get isPending => state == AppInspectCallState.pending;
   bool get isRepeated => repeatCount > 1;
 
-  /// A failure without a response, a 4xx or 5xx response, or a response the
-  /// app couldn't read. A call the app cancelled isn't one.
+  /// A failure without a response, a 4xx or 5xx response, a response the
+  /// app couldn't read, or GraphQL errors. A call the app cancelled isn't one.
   bool get isError =>
-      (state == AppInspectCallState.failed && !cancelled) || (statusCode ?? 0) >= 400 || parseError != null;
+      (state == AppInspectCallState.failed && !cancelled) ||
+      (statusCode ?? 0) >= 400 ||
+      parseError != null ||
+      graphQLErrors.isNotEmpty;
 
   bool isSlow(Duration threshold) {
     final d = duration;

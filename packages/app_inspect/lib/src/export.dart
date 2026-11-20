@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'format.dart';
 import 'models.dart';
+import 'timeline.dart';
 import 'version.dart';
 
 const JsonEncoder _pretty = JsonEncoder.withIndent('  ');
@@ -71,7 +72,8 @@ String buildHar(List<AppInspectCall> calls, AppInspectMasker masker) {
           'cache': <String, Object>{},
           'timings': {'send': 0, 'wait': c.duration?.inMilliseconds ?? 0, 'receive': 0},
           '_screen': c.visit.name,
-          if (c.isError) '_issue': c.parseError != null ? describeParseError(c, c.parseError!) : c.statusLabel,
+          if (c.graphQL case final graphQL?) '_graphql': graphQL.label,
+          if (c.isError) '_issue': _issue(c),
         };
       }(),
   ];
@@ -84,9 +86,39 @@ String buildHar(List<AppInspectCall> calls, AppInspectMasker masker) {
   });
 }
 
+/// The problem with a failed call in plain words.
+String _issue(AppInspectCall c) {
+  if (c.parseError case final error?) return describeParseError(c, error);
+  if (c.graphQLErrors.isNotEmpty) return '${c.statusLabel}, GraphQL errors: ${describeGraphQLErrors(c.graphQLErrors)}';
+  return c.statusLabel;
+}
+
 /// [calls] as a Postman collection (v2.1), so the backend team can send the
-/// same requests. Masked values stay masked.
+/// same requests. Masked values stay masked. A GraphQL operation opens in
+/// Postman's GraphQL editor, with its variables.
 String buildPostmanCollection(List<AppInspectCall> calls, AppInspectMasker masker, {required String name}) {
+  Map<String, Object?> body(AppInspectCall c) {
+    final graphQL = c.graphQL;
+    final query = graphQL?.query;
+    if (graphQL != null && query != null && graphQL.batchSize == 1) {
+      final variables = graphQL.variables;
+      return {
+        'mode': 'graphql',
+        'graphql': {
+          'query': query,
+          'variables': variables == null ? '' : encodeBody(masker.json(variables)),
+        },
+      };
+    }
+    return {
+      'mode': 'raw',
+      'raw': _text(c.requestBody, masker),
+      'options': {
+        'raw': {'language': 'json'},
+      },
+    };
+  }
+
   return _pretty.convert({
     'info': {
       'name': name,
@@ -95,21 +127,14 @@ String buildPostmanCollection(List<AppInspectCall> calls, AppInspectMasker maske
     'item': [
       for (final c in calls)
         {
-          'name': '${c.method} ${masker.path(c)}',
+          'name': callTitle(c, masker),
           'request': {
             'method': c.method,
             'header': [
               for (final e in c.requestHeaders.entries) {'key': e.key, 'value': masker.header(e.key, e.value)},
             ],
             'url': masker.url(c.uri),
-            if (c.requestBody != null)
-              'body': {
-                'mode': 'raw',
-                'raw': _text(c.requestBody, masker),
-                'options': {
-                  'raw': {'language': 'json'},
-                },
-              },
+            if (c.requestBody != null) 'body': body(c),
           },
         },
     ],
@@ -166,13 +191,13 @@ String buildReportMarkdown({
       ..writeln('| --- | --- | --- | --- |');
     for (final c in calls) {
       final issues = insightsFor(c, slowThreshold: slowThreshold).map((i) => i.title).join(', ');
-      out.writeln('| `${c.method} ${masker.path(c)}` | ${c.statusLabel} | ${formatDuration(c.duration)} | '
+      out.writeln('| `${callTitle(c, masker)}` | ${c.statusLabel} | ${formatDuration(c.duration)} | '
           '${issues.isEmpty ? '—' : issues} |');
     }
     for (final c in calls.where((c) => c.isError)) {
       out
-        ..writeln('\n#### ${c.method} ${masker.path(c)} · ${c.statusLabel}')
-        ..writeln(c.parseError != null ? describeParseError(c, c.parseError!) : '')
+        ..writeln('\n#### ${callTitle(c, masker)} · ${c.statusLabel}')
+        ..writeln(c.parseError != null || c.graphQLErrors.isNotEmpty ? _issue(c) : '')
         ..writeln('```bash')
         ..writeln(buildCurl(c, masker))
         ..writeln('```');
@@ -193,6 +218,56 @@ String buildReportMarkdown({
       ..writeln('```')
       ..write(logsToText(logs))
       ..writeln('```');
+  }
+  return out.toString();
+}
+
+/// The session as numbered steps in Markdown, oldest first: the screens
+/// people moved to, the calls each made and what the logs said, with failed
+/// and slow calls marked. Paste it into a bug report as the steps that led to
+/// the bug. Masked values stay masked.
+///
+/// Only the last [maxEntries] steps are kept, so the text stays short enough
+/// for a chat message.
+String buildTimelineMarkdown({
+  required List<AppInspectScreenChange> screens,
+  required List<AppInspectCall> calls,
+  required List<AppInspectLog> logs,
+  required AppInspectMasker masker,
+  required Duration slowThreshold,
+  int maxEntries = 200,
+}) {
+  final all = buildTimeline(screens: screens, calls: calls, logs: logs);
+  final shown = all.length > maxEntries ? all.sublist(all.length - maxEntries) : all;
+  final out = StringBuffer('## Session timeline\n\n');
+  if (shown.isEmpty) return '${out}Nothing happened yet.\n';
+  if (shown.length < all.length) out.write('_The last ${shown.length} of ${all.length} steps._\n\n');
+  for (final (i, entry) in shown.indexed) {
+    out.write('${i + 1}. ${formatTime(entry.time)} ');
+    switch (entry) {
+      case ScreenEntry(:final change):
+        out.write('${change.returned ? 'Back to' : 'Opened'} **${change.visit.name}**');
+      case CallEntry(:final call):
+        out.write('`${callTitle(call, masker)}` → ${call.statusLabel}');
+        if (!call.isPending) out.write(', ${formatDuration(call.duration)}');
+        final problems = [
+          if (call.parseError != null) 'parse error',
+          if (call.graphQLErrors.isNotEmpty) 'GraphQL error: ${describeGraphQLErrors(call.graphQLErrors)}',
+          if (call.isError && call.parseError == null && call.graphQLErrors.isEmpty) 'failed',
+          if (call.isSlow(slowThreshold)) 'slow',
+        ];
+        if (problems.isNotEmpty) out.write(' · **${problems.join(', ')}**');
+      case LogEntry(:final log):
+        final line = log.message.split('\n').first.trim();
+        final level = switch (log.level) {
+          AppInspectLogLevel.debug => 'Debug',
+          AppInspectLogLevel.info => 'Log',
+          AppInspectLogLevel.warning => '**Warning**',
+          AppInspectLogLevel.error => '**Error**',
+        };
+        out.write('$level (${log.source}): ${line.length > 160 ? '${line.substring(0, 160)}…' : line}');
+    }
+    out.writeln();
   }
   return out.toString();
 }

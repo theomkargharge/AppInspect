@@ -166,6 +166,8 @@ Future<void> walkThrough(WidgetTester tester, ErrorLog log) async {
   await visitCall('/banner.png');
   await visitCall('/terms');
   await visitCall('/auth/me');
+  await visitCall('GetCartWithRecommendations');
+  await visitCall('ApplyPromo');
 
   await step('JSON value actions', () async {
     await search('limit=12');
@@ -209,6 +211,30 @@ Future<void> walkThrough(WidgetTester tester, ErrorLog log) async {
     await tapAndSettle(find.byKey(const ValueKey('app_inspect_tab_network')));
   });
 
+  await step('timeline', () async {
+    AppInspect.markScreen('OrderConfirmationScreenWithALongNameThatKeepsGoing');
+    finishedCall('GET', 'https://dummyjson.com/carts/51?include=products,discounts,shipping,taxes,recommendations',
+        took: const Duration(milliseconds: 2300));
+    AppInspect.log('Checkout finished, but the total looks off. ' * 4, level: AppInspectLogLevel.warning);
+    await tapAndSettle(find.byKey(const ValueKey('app_inspect_tab_timeline')));
+    for (final filter in ['Screens', 'Calls', 'Problems', 'Steps']) {
+      await tapAndSettle(find.text(filter));
+    }
+    await tester.fling(find.byType(CustomScrollView).hitTestable().first, const Offset(0, -3000), 3000);
+    await tester.pumpAndSettle();
+    await tester.fling(find.byType(CustomScrollView).hitTestable().first, const Offset(0, 3000), 3000);
+    await tester.pumpAndSettle();
+    await tapAndSettle(find.textContaining('Checkout finished'));
+    await tapAndSettle(find.byTooltip('Share the steps'));
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    await search('GetCart');
+    await tapAndSettle(label('GetCartWithRecommendations'));
+    await tapAndSettle(find.text('Request'));
+    await pressBack(tester);
+    await tapAndSettle(find.byKey(const ValueKey('app_inspect_tab_network')));
+  });
+
   await step('close', () async {
     await pressBack(tester);
     await tester.pump(const Duration(seconds: 3));
@@ -244,7 +270,23 @@ void main() {
     mockClipboard(tester);
     final log = ErrorLog();
     try {
-      await tester.pumpWidget(testApp(const HomeScreen(), config: const AppInspectConfig(darkTheme: true)));
+      await tester
+          .pumpWidget(testApp(const HomeScreen(), config: const AppInspectConfig(themeMode: AppInspectThemeMode.dark)));
+      await tester.pumpAndSettle();
+      await walkThrough(tester, log);
+    } finally {
+      log.restore();
+    }
+    expect(log.errors, isEmpty);
+  });
+
+  testWidgets('no layout errors in a dark app theme on a small phone', (tester) async {
+    setScreen(tester, screens['iPhone SE (1st gen)']!, textScale: 1.3);
+    mockClipboard(tester);
+    final log = ErrorLog();
+    try {
+      await tester.pumpWidget(testApp(const HomeScreen(),
+          theme: ThemeData(colorSchemeSeed: const Color(0xFF0F9D58), brightness: Brightness.dark)));
       await tester.pumpAndSettle();
       await walkThrough(tester, log);
     } finally {

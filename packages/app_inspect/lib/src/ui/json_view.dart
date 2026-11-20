@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart' show setEquals;
-import 'package:flutter/material.dart';
 
 import '../format.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -181,8 +181,8 @@ class _JsonSliverState extends State<JsonSliver> {
                 ),
                 NlActionTile(
                   icon: Icons.alt_route_rounded,
-                  color: t.violet,
-                  background: t.violetSoft,
+                  color: t.accentAlt,
+                  background: t.accentAltSoft,
                   title: 'Copy path',
                   subtitle: shownPath,
                   onTap: () {

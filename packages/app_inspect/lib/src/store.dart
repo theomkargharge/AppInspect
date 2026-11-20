@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 
 import 'config.dart';
 import 'format.dart';
+import 'graphql.dart';
 import 'models.dart';
 
 /// Holds the captured calls and screen visits.
@@ -17,6 +18,7 @@ class AppInspectStore extends ChangeNotifier {
   final List<AppInspectCall> _calls = [];
   final List<AppInspectVisit> _visits = [];
   final List<AppInspectLog> _logs = [];
+  final List<AppInspectScreenChange> _screenChanges = [];
   AppInspectVisit? _current;
   int _nextId = 1;
   bool _notifyScheduled = false;
@@ -83,6 +85,10 @@ class AppInspectStore extends ChangeNotifier {
   /// Screen visits, oldest first.
   List<AppInspectVisit> get visits => UnmodifiableListView(_visits);
 
+  /// Every move to a screen, new or earlier, oldest first. With [calls] and
+  /// [logs], it makes the session timeline.
+  List<AppInspectScreenChange> get screenChanges => UnmodifiableListView(_screenChanges);
+
   /// The screen on top right now. Calls started now are tagged with it.
   AppInspectVisit get currentVisit => _current ??= _addVisit('App');
 
@@ -90,6 +96,7 @@ class AppInspectStore extends ChangeNotifier {
   AppInspectVisit startVisit(String name) {
     final visit = _addVisit(name);
     _current = visit;
+    _addScreenChange(AppInspectScreenChange(visit: visit, time: visit.startedAt));
     _scheduleNotify();
     return visit;
   }
@@ -98,7 +105,15 @@ class AppInspectStore extends ChangeNotifier {
   void resumeVisit(AppInspectVisit visit) {
     if (identical(_current, visit)) return;
     _current = visit;
+    _addScreenChange(AppInspectScreenChange(visit: visit, time: DateTime.now(), returned: true));
     _scheduleNotify();
+  }
+
+  void _addScreenChange(AppInspectScreenChange change) {
+    _screenChanges.add(change);
+    if (_screenChanges.length > config.maxCalls + 50) {
+      _screenChanges.removeRange(0, _screenChanges.length - config.maxCalls);
+    }
   }
 
   /// Records the start of a request and returns the call to finish later.
@@ -150,6 +165,7 @@ class AppInspectStore extends ChangeNotifier {
       unseenErrors.value++;
       _logFailure(call);
     }
+    _readGraphQLErrors(call);
     _scheduleNotify();
   }
 
@@ -176,7 +192,31 @@ class AppInspectStore extends ChangeNotifier {
       ..endedAt = DateTime.now();
     unseenErrors.value++;
     _logFailure(call);
+    _readGraphQLErrors(call);
     _scheduleNotify();
+  }
+
+  /// GraphQL servers report errors in the response body, usually with
+  /// `200 OK`. For a GraphQL call, AppInspect looks for them: a decoded body
+  /// right away, and text only when it mentions `"errors"`, on another
+  /// isolate when it's large. A call that wasn't a failure yet becomes one
+  /// and turns the bubble red.
+  void _readGraphQLErrors(AppInspectCall call) {
+    final body = call.responseBody;
+    if (body == null || call.graphQL == null) return;
+    if (body is String && !body.contains('"errors"')) return;
+    if (body is! String && body is! Map && body is! List) return;
+    decodeBodyAsync(body).then((decoded) {
+      final errors = AppInspectGraphQLError.listFrom(decoded);
+      if (errors.isEmpty) return;
+      final wasError = call.isError;
+      call.graphQLErrors = List.unmodifiable(errors);
+      if (!wasError) {
+        unseenErrors.value++;
+        _logFailure(call);
+      }
+      _scheduleNotify();
+    }, onError: (Object _) {});
   }
 
   /// Records a call the app cancelled on purpose, such as a search that was
@@ -193,12 +233,20 @@ class AppInspectStore extends ChangeNotifier {
     _scheduleNotify();
   }
 
-  void _logFailure(AppInspectCall call) => addLog(
-        AppInspectLogLevel.warning,
-        '${call.method} ${_maskedPath(call)} → ${call.statusLabel}',
-        source: 'Network',
-        call: call,
-      );
+  void _logFailure(AppInspectCall call) {
+    final graphQL = call.graphQL;
+    final errors = call.graphQLErrors;
+    addLog(
+      AppInspectLogLevel.warning,
+      graphQL == null
+          ? '${call.method} ${_maskedPath(call)} → ${call.statusLabel}'
+          : '${graphQL.label} → ${call.statusLabel}'
+              '${errors.isEmpty ? '' : ', ${errors.length == 1 ? 'GraphQL error' : '${errors.length} GraphQL errors'}: '
+                  '${errors.first.summary}'}',
+      source: 'Network',
+      call: call,
+    );
+  }
 
   /// Log lines are written once, so a token in the URL is always masked
   /// there. The call itself keeps it, for a developer to see in Settings.
@@ -261,7 +309,9 @@ class AppInspectStore extends ChangeNotifier {
     for (var i = _calls.length - 1; i >= 0; i--) {
       final c = _calls[i];
       if (now.difference(c.startedAt) > config.repeatWindow) break;
-      if (identical(c.visit, call.visit) && c.method == call.method && c.uri == call.uri) {
+      // GraphQL calls share one URL, so they repeat only when they send the
+      // same operation with the same variables.
+      if (identical(c.visit, call.visit) && c.method == call.method && c.uri == call.uri && c.graphQL == call.graphQL) {
         same.add(c);
       }
     }

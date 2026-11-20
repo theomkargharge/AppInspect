@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../export.dart';
@@ -9,6 +8,7 @@ import '../app_inspect.dart';
 import '../sharing.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'theme.dart';
 import 'widgets.dart';
 

@@ -5,7 +5,7 @@
 library;
 
 export 'src/config.dart';
-export 'src/export.dart' show buildHar, buildPostmanCollection, buildReportMarkdown, logsToText;
+export 'src/export.dart' show buildHar, buildPostmanCollection, buildReportMarkdown, buildTimelineMarkdown, logsToText;
 export 'src/format.dart'
     show
         AppInspectInsight,
@@ -17,6 +17,7 @@ export 'src/format.dart'
         describeParseError,
         insightsFor,
         appInspectMask;
+export 'src/graphql.dart';
 export 'src/models.dart';
 export 'src/app_inspect.dart' show AppInspect;
 export 'src/screens.dart' show AppInspectNavigatorObserver, AppInspectScreen;

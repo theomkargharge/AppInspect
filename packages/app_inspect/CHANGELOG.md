@@ -1,3 +1,19 @@
+## 0.2.3
+
+* New: GraphQL calls are named after their operation. Every GraphQL call goes to the same URL, such as `POST /graphql`, so the call list shows `QUERY GetCart` or `MUTATION AddToCart` instead, and search finds calls by operation name. AppInspect reads queries sent as JSON, in the URL of a GET, as `application/graphql`, in batches, and persisted queries. There's nothing to set up.
+* New: GraphQL errors are failures. Servers usually send them with `200 OK`, so AppInspect reads the response: the call turns red, the bubble too, and the call says what went wrong, such as "Cart not found (NOT_FOUND, at cart)". The field it points at is highlighted in the response.
+* New: the call details show the GraphQL operation and its variables. Postman exports open in Postman's GraphQL editor, and HAR, Markdown and bug reports name the operation. New: `AppInspectCall.graphQL` and `graphQLErrors`.
+* Fixed: GraphQL calls on one screen were all marked "Repeated", since they share a URL. A call now repeats only with the same operation and variables.
+* New: a Timeline tab. It shows the session in one list: the screens people opened and went back to, the calls each made and the logs, with the time between them. Tap Problems for failed and slow calls, warnings and errors, and share the steps as Markdown for a bug report. New: `AppInspectStore.screenChanges` and `buildTimelineMarkdown`.
+* Fixed: pub.dev's static analysis. Flutter 3.47 deprecated `package:flutter/material.dart` and `cupertino.dart` in favor of the `material_ui` and `cupertino_ui` packages. AppInspect keeps working from Flutter 3.27, so it keeps the framework's libraries for now, in one place.
+* AppInspect follows the theme of an app built with `material_ui` or `cupertino_ui` too, not only with the framework's MaterialApp and CupertinoApp.
+* New: the inspector and the bubble take your app's colors: its primary color, surfaces, text and outlines, light or dark like the app. When the app's theme changes, such as to dark mode, they change with it. There's nothing to set up: AppInspect reads the theme your MaterialApp or CupertinoApp builds. Status colors stay AppInspect's own, so a failure is red in every app.
+* A theme that leaves `colorScheme.primary` at Flutter's default, such as one made with `ColorScheme.fromSwatch()`, usually keeps its brand color in `primaryColor` or the app bar. AppInspect takes it from there.
+* New: `AppInspectConfig.themeMode` and `AppInspect.themeMode`: `AppInspectThemeMode.app`, the default, or AppInspect's own `light` or `dark` theme. Settings has App, Light and Dark.
+* Changed: the inspector starts in the app's theme instead of its own light one. Pass `themeMode: AppInspectThemeMode.light` for the earlier look.
+* In an app whose own color is red, the bubble turns solid red when something fails, since a red ring wouldn't stand out.
+* Deprecated: `AppInspectConfig.darkTheme` and `AppInspect.darkTheme`. Use `themeMode`. Both still work.
+
 ## 0.2.2
 
 * The repository moved to https://github.com/theomkargharge/AppInspect.

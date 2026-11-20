@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'material.dart';
 import 'theme.dart';
 
 /// Shrinks a little while pressed and gives a light haptic tap, so every

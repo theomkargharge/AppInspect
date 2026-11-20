@@ -104,4 +104,22 @@ void main() {
     expect(call.responseBody, '{"items":[1,2,3]}');
     expect(call.bodyTruncated, isFalse);
   });
+
+  test('names a GraphQL call after its operation and fails it on GraphQL errors', () async {
+    final client = AppInspectHttpClient(MockClient((_) async {
+      return http.Response('{"data":null,"errors":[{"message":"Cart not found","path":["cart"]}]}', 200,
+          headers: {'content-type': 'application/json'});
+    }));
+
+    await client.post(
+      Uri.parse('https://api.test/graphql'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'query': 'query GetCart { cart { id } }'}),
+    );
+
+    final call = AppInspect.store.calls.single;
+    expect(call.graphQL?.label, 'query GetCart');
+    expect(call.graphQLErrors.single.summary, 'Cart not found (at cart)');
+    expect(call.isError, isTrue);
+  });
 }

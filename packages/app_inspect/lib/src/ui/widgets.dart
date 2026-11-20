@@ -1,12 +1,13 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../format.dart';
+import '../graphql.dart';
 import '../models.dart';
 import '../app_inspect.dart';
 import '../sharing.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'theme.dart';
 
 /// The masker for what's on screen right now, following the Settings switch.
@@ -60,6 +61,28 @@ class NlMethodPill extends StatelessWidget {
   }
 }
 
+/// The HTTP method of [call], or the kind of its GraphQL operation, such as
+/// a blue QUERY or a green MUTATION.
+class NlOperationPill extends StatelessWidget {
+  const NlOperationPill(this.call, {super.key});
+
+  final AppInspectCall call;
+
+  @override
+  Widget build(BuildContext context) {
+    final graphQL = call.graphQL;
+    if (graphQL == null) return NlMethodPill(call.method);
+    final t = AppInspectTokens.of(context);
+    final (label, fg, bg) = switch (graphQL.type) {
+      AppInspectGraphQLType.query => ('QUERY', t.info, t.infoSoft),
+      AppInspectGraphQLType.mutation => ('MUTATION', t.ok, t.okSoft),
+      AppInspectGraphQLType.subscription => ('SUBSCRIPTION', t.violet, t.violetSoft),
+      null => ('GRAPHQL', t.violet, t.violetSoft),
+    };
+    return NlPill(label: label, foreground: fg, background: bg, mono: true);
+  }
+}
+
 /// Status in plain words with a colored dot. A parse error gets its own pill.
 class NlStatusPill extends StatelessWidget {
   const NlStatusPill(this.call, {super.key});
@@ -93,6 +116,13 @@ List<Widget> flagPills(BuildContext context, AppInspectCall call) {
   return [
     if (call.parseError != null)
       NlPill(label: 'Parse error', foreground: t.err, background: t.errSoft, icon: Icons.data_object_rounded),
+    if (call.graphQLErrors.isNotEmpty)
+      NlPill(
+        label: call.graphQLErrors.length == 1 ? 'GraphQL error' : '${call.graphQLErrors.length} GraphQL errors',
+        foreground: t.err,
+        background: t.errSoft,
+        icon: Icons.error_outline_rounded,
+      ),
     if (call.isSlow(AppInspect.slowThreshold.value))
       NlPill(label: 'Slow', foreground: t.warn, background: t.warnSoft, icon: Icons.schedule_rounded),
     if (call.isRepeated)

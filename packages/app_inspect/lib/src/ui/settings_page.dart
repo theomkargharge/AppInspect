@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
-
 import '../format.dart';
 import '../app_inspect.dart';
+import '../config.dart';
 import '../version.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'theme.dart';
 
 /// Masking, theme, slow-call limit and storage.
@@ -15,7 +15,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable:
-          Listenable.merge([AppInspect.store, AppInspect.maskData, AppInspect.darkTheme, AppInspect.slowThreshold]),
+          Listenable.merge([AppInspect.store, AppInspect.maskData, AppInspect.themeMode, AppInspect.slowThreshold]),
       builder: (context, _) {
         final t = AppInspectTokens.of(context);
         final config = AppInspect.config;
@@ -66,13 +66,20 @@ class SettingsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text('AppInspect only. Your app keeps its own theme.',
+                      Text(
+                          AppInspect.themeMode.value == AppInspectThemeMode.app
+                              ? 'Follows your app\'s colors and dark mode.'
+                              : 'AppInspect only. Your app keeps its own theme.',
                           style: TextStyle(fontSize: 13, color: t.textSecondary)),
                       const SizedBox(height: 12),
-                      NlSegmented<bool>(
-                        value: AppInspect.darkTheme.value,
-                        onChanged: (v) => AppInspect.darkTheme.value = v,
-                        options: const [(false, 'Light'), (true, 'Dark')],
+                      NlSegmented<AppInspectThemeMode>(
+                        value: AppInspect.themeMode.value,
+                        onChanged: (v) => AppInspect.themeMode.value = v,
+                        options: const [
+                          (AppInspectThemeMode.app, 'App'),
+                          (AppInspectThemeMode.light, 'Light'),
+                          (AppInspectThemeMode.dark, 'Dark'),
+                        ],
                       ),
                     ],
                   ),
@@ -105,7 +112,7 @@ class SettingsPage extends StatelessWidget {
                           label: 'Log entries',
                           used: AppInspect.store.logs.length,
                           max: config.maxLogs,
-                          color: t.violet),
+                          color: t.accentAlt),
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(

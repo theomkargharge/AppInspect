@@ -16,6 +16,8 @@ Tap the floating bubble and AppInspect shows the API calls of the screen you're 
 - **A bubble that turns red.** Its badge counts the API calls on the current screen, and it turns red when something fails, even when the app shows nothing. A tab you come back to keeps its count.
 - **Plain-language status.** `500 Server error`, `404 Not found`, `Timeout`, `No connection`. A request the app cancels shows as `Cancelled` and isn't counted as a failure.
 - **Parse errors linked to the response.** When the server answers 200 but the app can't read it, AppInspect says so, names the field and highlights it: "The server answered 201 Created, but the app failed at total: expected int, got double. In CartResult.fromJson (cart.dart:42)."
+- **GraphQL.** Calls are named after their operation, such as `QUERY GetCart`, not `POST /graphql`. GraphQL errors sent with `200 OK` turn the call red and say what failed.
+- **Session timeline.** The screens people opened, the calls each made and the logs, in one list with the time between them. Share it as the steps that led to a bug.
 - **Insights.** Server errors, rejected requests, slow calls and calls repeated in a row (often an API call inside `build()`).
 - **Request and response details.** The final URL, the headers after every interceptor, the request body, and the raw response before your app parses it.
 - **JSON viewer.** Fold and unfold nodes. Tap a value to copy it or its path, such as `data.items[0].price`.
@@ -24,13 +26,14 @@ Tap the floating bubble and AppInspect shows the API calls of the screen you're 
 - **Masking.** Authorization headers, cookies, passwords and tokens are masked on screen and in every export, in the body and in the URL's query parameters too. A developer can reveal one header when needed.
 - **Safe for production.** On in debug builds. In profile and release builds it's on only with `--dart-define=APP_INSPECT=true`, so production builds don't contain it.
 - **PIN for UAT builds.** Lock the inspector in builds you hand to people outside the team.
-- **Easy on the eyes.** A light, touch-first inspector: tap a stat tile to filter, haptics on every tap, smooth transitions and a frosted action bar. Drag the bubble anywhere and it springs to the nearest edge. Dark theme in Settings.
+- **Easy on the eyes.** A touch-first inspector: tap a stat tile to filter, haptics on every tap, smooth transitions and a frosted action bar. Drag the bubble anywhere and it springs to the nearest edge.
+- **Looks like your app.** The inspector and the bubble take your app's colors, and follow it into dark mode and back.
 
 ## Setup
 
 ```yaml
 dependencies:
-  app_inspect: ^0.2.2
+  app_inspect: ^0.2.3
   app_inspect_dio: ^0.2.2   # if you use Dio
   app_inspect_http: ^0.2.2  # if you use package:http
 ```
@@ -99,6 +102,30 @@ final client = RestClient(dio, errorLogger: AppInspectParseErrorLogger());
 
 Retrofit parses the response itself, so AppInspect can't see which field it read last. It lists the likely fields instead: values of the type the app got, such as every number with decimals when the app expected an `int`.
 
+## GraphQL
+
+There's nothing to set up. AppInspect reads the operation from the request: a JSON body with `query` and `operationName`, the same in the URL of a GET, an `application/graphql` body, a batch, or a persisted query. The call list shows `QUERY GetCart` or `MUTATION AddToCart`, and search finds calls by operation name.
+
+GraphQL servers usually answer `200 OK` even when an operation fails, with an `errors` list in the body. AppInspect reads it: the call and the bubble turn red, and the call says what failed and where, such as "Cart not found (NOT_FOUND, at cart)".
+
+With graphql_flutter or ferry, give the HTTP link AppInspect's client:
+
+```dart
+final link = HttpLink('https://api.example.com/graphql', httpClient: AppInspectHttpClient());
+```
+
+With a Dio-based link, add `AppInspectDioInterceptor` to its Dio.
+
+## Timeline
+
+The Timeline tab shows the whole session, newest first: the screens people opened and went back to, the calls each made and the logs, with the time between them. Tap Problems for failed and slow calls, warnings and errors. Share turns it into numbered steps for a bug report:
+
+```md
+1. 14:00:00 Opened **CartScreen**
+2. 14:00:01 `query GetCart` → 200 OK, 180 ms · **GraphQL error: Cart not found (at cart)**
+3. 14:00:04 `POST /orders` → 500 Server error, 320 ms · **failed**
+```
+
 ## Sharing
 
 Without any setup, Share copies text to the clipboard. To send files, connect your share sheet:
@@ -159,6 +186,18 @@ Or call `AppInspect.markScreen('CartTab')` yourself.
 
 Screens pushed without a route name are named after their widget, such as `ProductDetailsScreen`. AppInspect looks for the first widget on the route whose type ends in `Screen`, `Page` or `View`.
 
+## Theme
+
+By default the inspector and the bubble take your app's colors: its primary color, surfaces and text, light or dark like the app. When your app's theme changes, such as to dark mode, AppInspect changes with it. Status colors stay the same in every app, so a failure is always red.
+
+There's nothing to set up: AppInspect reads the theme your `MaterialApp` or `CupertinoApp` builds. A `Theme` around a single screen doesn't change it. Its main color is your theme's `colorScheme.primary`. If your theme leaves that at Flutter's default, as `ColorScheme.fromSwatch()` does, AppInspect takes your theme's `primaryColor` or app bar color instead. To use AppInspect's own theme instead:
+
+```dart
+AppInspectConfig(themeMode: AppInspectThemeMode.light) // or AppInspectThemeMode.dark
+```
+
+People can switch between App, Light and Dark in Settings.
+
 ## Settings
 
 ```dart
@@ -171,7 +210,7 @@ AppInspectConfig(
   maskedBodyKeys: {'password', 'token', 'otp'}, // in JSON bodies and URL query parameters
   showBubble: true,                      // false: open with AppInspect.open()
   captureLogs: true,                     // debugPrint, Flutter and uncaught errors
-  darkTheme: false,                      // true: start in the dark theme
+  themeMode: AppInspectThemeMode.app,    // .light or .dark: AppInspect's own theme
 );
 ```
 
@@ -204,6 +243,5 @@ Not captured: traffic from native SDKs (Firebase, payment SDKs) and clients that
 
 ## Coming next
 
-- Session timeline and GraphQL operation names.
 - Fault injection, slow network and offline mode, edit and resend, compare two calls.
 - Environment switcher, WebSocket frames, analytics events, and viewing a phone's session on a laptop.

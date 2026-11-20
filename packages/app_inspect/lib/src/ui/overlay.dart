@@ -1,23 +1,26 @@
 import 'dart:math' as math;
 
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../app_inspect.dart';
 import '../schedule.dart';
+import 'app_theme.dart';
 import 'bubble.dart';
+import 'cupertino.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
 import 'list_page.dart';
 import 'logs_page.dart';
+import 'material.dart';
 import 'theme.dart';
+import 'timeline_page.dart';
 
 /// Sits above the app: the app itself, the bubble, and the inspector.
 ///
 /// The inspector brings its own theme, localizations and navigator, so it
-/// never touches the app's route stack, theme or analytics.
+/// never touches the app's route stack, theme or analytics. Its theme takes
+/// the app's colors unless people pick AppInspect's light or dark one.
 class AppInspectOverlay extends StatelessWidget {
   const AppInspectOverlay({super.key, required this.child});
 
@@ -135,10 +138,12 @@ class _AppInspectInspectorState extends State<AppInspectInspector> {
   Widget build(BuildContext context) {
     // Everything, the PIN screen included, lives inside the navigator, which
     // gives text fields, tooltips and toasts the overlay they need.
-    return ValueListenableBuilder<bool>(
-      valueListenable: AppInspect.darkTheme,
-      builder: (context, dark, _) {
-        final theme = buildAppInspectTheme(dark: dark);
+    return ListenableBuilder(
+      listenable: appInspectLookChanges,
+      builder: (context, _) {
+        final look = currentAppInspectLook();
+        final theme = buildAppInspectTheme(look.tokens, scheme: look.scheme);
+        final dark = look.tokens.brightness == Brightness.dark;
         // The inspector is dense, so it follows the system text size up to
         // 1.3x, about the largest standard setting, and stays usable on small
         // phones beyond that.
@@ -217,7 +222,7 @@ class _InspectorTabsState extends State<_InspectorTabs> {
           // Each tab is its own Scaffold and handles the keyboard itself.
           resizeToAvoidBottomInset: false,
           extendBody: true,
-          body: IndexedStack(index: _tab, children: const [CallListPage(), LogsPage()]),
+          body: IndexedStack(index: _tab, children: const [CallListPage(), LogsPage(), TimelinePage()]),
           bottomNavigationBar: NlNavBar(
             index: _tab,
             onChanged: (i) => setState(() => _tab = i),
@@ -225,6 +230,8 @@ class _InspectorTabsState extends State<_InspectorTabs> {
               const NlNavItem(icon: Icons.sync_alt_rounded, label: 'Network', key: ValueKey('app_inspect_tab_network')),
               NlNavItem(
                   icon: Icons.notes_rounded, label: 'Logs', badge: errors, key: const ValueKey('app_inspect_tab_logs')),
+              const NlNavItem(
+                  icon: Icons.timeline_rounded, label: 'Timeline', key: ValueKey('app_inspect_tab_timeline')),
             ],
           ),
         );

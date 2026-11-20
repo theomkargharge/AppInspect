@@ -1,11 +1,15 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageTransition, CupertinoRouteTransitionMixin;
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
-/// Colors, shadows and code colors for the inspector, in its light and dark
-/// themes. Read them with `AppInspectTokens.of(context)`.
+import 'cupertino.dart';
+import 'material.dart';
+
+/// Colors, shadows and code colors for the inspector: its own light and dark
+/// themes, or ones made from the app's theme. Read them with
+/// `AppInspectTokens.of(context)`.
 @immutable
 class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
   const AppInspectTokens({
+    required this.brightness,
     required this.canvas,
     required this.surface,
     required this.surfaceAlt,
@@ -17,12 +21,15 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
     required this.accent,
     required this.accentSoft,
     required this.onAccent,
+    required this.accentAlt,
+    required this.accentAltSoft,
     required this.ok,
     required this.okSoft,
     required this.warn,
     required this.warnSoft,
     required this.err,
     required this.errSoft,
+    required this.onErr,
     required this.info,
     required this.infoSoft,
     required this.violet,
@@ -36,6 +43,9 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
     required this.jsonLiteral,
     required this.codeBg,
   });
+
+  /// Whether these are light or dark colors.
+  final Brightness brightness;
 
   /// The page behind cards.
   final Color canvas;
@@ -61,7 +71,16 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
   final Color accentSoft;
   final Color onAccent;
 
+  /// A second accent, for the Logs page and for actions next to [accent]
+  /// ones. Violet in AppInspect's own themes, the app's primary color in one
+  /// made from the app's theme. Text and icons on it use [onAccent].
+  final Color accentAlt;
+  final Color accentAltSoft;
+
   final Color ok, okSoft, warn, warnSoft, err, errSoft, info, infoSoft, violet, violetSoft;
+
+  /// Text and icons on [err].
+  final Color onErr;
 
   /// Shadow tint for cards and the bubble.
   final Color shadow;
@@ -76,6 +95,7 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
   final Color codeBg;
 
   static const light = AppInspectTokens(
+    brightness: Brightness.light,
     canvas: Color(0xFFF4F5F8),
     surface: Color(0xFFFFFFFF),
     surfaceAlt: Color(0xFFEFF1F5),
@@ -87,12 +107,15 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
     accent: Color(0xFF4F46E5),
     accentSoft: Color(0xFFEEEFFE),
     onAccent: Color(0xFFFFFFFF),
+    accentAlt: Color(0xFF7C3AED),
+    accentAltSoft: Color(0xFFF2ECFE),
     ok: Color(0xFF15803D),
     okSoft: Color(0xFFE8F7EE),
     warn: Color(0xFFB45309),
     warnSoft: Color(0xFFFFF3DD),
     err: Color(0xFFDC2626),
     errSoft: Color(0xFFFEEDED),
+    onErr: Color(0xFFFFFFFF),
     info: Color(0xFF2563EB),
     infoSoft: Color(0xFFE9F1FF),
     violet: Color(0xFF7C3AED),
@@ -108,6 +131,7 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
   );
 
   static const dark = AppInspectTokens(
+    brightness: Brightness.dark,
     canvas: Color(0xFF0B0F17),
     surface: Color(0xFF131A26),
     surfaceAlt: Color(0xFF1B2333),
@@ -119,12 +143,15 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
     accent: Color(0xFF8C8DF9),
     accentSoft: Color(0xFF23264B),
     onAccent: Color(0xFF0B0F17),
+    accentAlt: Color(0xFFC4B5FD),
+    accentAltSoft: Color(0xFF2A2148),
     ok: Color(0xFF4ADE80),
     okSoft: Color(0xFF12301F),
     warn: Color(0xFFFBBF24),
     warnSoft: Color(0xFF3A2A0C),
     err: Color(0xFFF87171),
     errSoft: Color(0xFF3B1618),
+    onErr: Color(0xFF0B0F17),
     info: Color(0xFF60A5FA),
     infoSoft: Color(0xFF13253F),
     violet: Color(0xFFC4B5FD),
@@ -138,6 +165,109 @@ class AppInspectTokens extends ThemeExtension<AppInspectTokens> {
     jsonLiteral: Color(0xFFC4B5FD),
     codeBg: Color(0xFF0F1522),
   );
+
+  /// Tokens made from the app's color scheme, so the inspector looks like
+  /// part of the app: its primary color, surfaces, text and outlines, light or
+  /// dark. [background] is the app's page color, `scaffoldBackgroundColor`.
+  ///
+  /// Status colors, such as red for a failed call or violet for a repeated
+  /// one, stay AppInspect's own, so they read the same in every app.
+  factory AppInspectTokens.fromScheme(ColorScheme scheme, {Color? background}) {
+    final s = scheme;
+    final dark = s.brightness == Brightness.dark;
+    final base = dark ? AppInspectTokens.dark : AppInspectTokens.light;
+    Color mix(Color a, Color b, double t) => Color.lerp(a, b, t)!;
+
+    // Whether a color can be a surface here: light in a light scheme, dark in
+    // a dark one. Some themes put a brand color in `surface`, such as a navy
+    // in a light theme, and cards can't take that.
+    bool fits(Color color) {
+      final lum = color.computeLuminance();
+      return color.a == 1 && (dark ? lum < 0.2 : lum > 0.5);
+    }
+
+    // Schemes from ColorScheme.fromSeed, and Material 3's default, have a
+    // range of surface containers. Older schemes leave them all the same, so
+    // AppInspect shades a surface itself.
+    final tiered = s.surfaceContainerLowest != s.surfaceContainerHighest &&
+        fits(s.surfaceContainerLowest) &&
+        fits(s.surfaceContainerHighest);
+    final paper =
+        [s.surface, s.surfaceContainerLowest, s.surfaceContainerHighest].firstWhere(fits, orElse: () => base.surface);
+    // Cards are the lightest surface in a light theme, as in AppInspect's own.
+    final surface = tiered
+        ? (dark ? s.surfaceContainerLow : s.surfaceContainerLowest)
+        : (dark ? mix(paper, s.onSurface, 0.05) : paper);
+    var canvas = tiered
+        ? (dark ? s.surfaceContainerLowest : s.surfaceContainerLow)
+        : (dark ? mix(paper, const Color(0xFF000000), 0.35) : mix(paper, s.onSurface, 0.045));
+    // An app that picked its own page color gets it behind the cards too, as
+    // long as it suits the brightness and the cards still stand out.
+    if (background != null && background != s.surface && fits(background)) {
+      if ((background.computeLuminance() - surface.computeLuminance()).abs() > 0.004) canvas = background;
+    }
+    final surfaceAlt = tiered ? s.surfaceContainer : mix(surface, s.onSurface, dark ? 0.07 : 0.06);
+    final raised = dark ? (tiered ? s.surfaceContainerHighest : mix(surface, s.onSurface, 0.14)) : surface;
+    // Roles a scheme doesn't set fall back to others, such as onBackground,
+    // which is white in a light scheme made with ColorScheme.fromSwatch. So a
+    // role is used only when its contrast on the cards suits its job.
+    final textContrast = _contrast(s.onSurface, surface);
+    bool suits(Color role, double min, double max) {
+      final c = _contrast(role, surface);
+      return role != s.onSurface && c >= min && c < max;
+    }
+
+    final border = suits(s.outlineVariant, 1.15, 3.5)
+        ? mix(s.outlineVariant, surface, dark ? 0.45 : 0.55)
+        : mix(s.onSurface, surface, dark ? 0.86 : 0.9);
+    final textSecondary =
+        suits(s.onSurfaceVariant, 4.5, textContrast) ? s.onSurfaceVariant : mix(s.onSurface, surface, 0.3);
+    final textMuted = suits(s.outline, 2.5, textContrast) ? s.outline : mix(s.onSurface, surface, 0.5);
+    final accentSoft = mix(surface, s.primary, dark ? 0.16 : 0.1);
+
+    return AppInspectTokens(
+      brightness: s.brightness,
+      canvas: canvas,
+      surface: surface,
+      surfaceAlt: surfaceAlt,
+      raised: raised,
+      border: border,
+      text: s.onSurface,
+      textSecondary: textSecondary,
+      textMuted: textMuted,
+      accent: s.primary,
+      accentSoft: accentSoft,
+      onAccent: s.onPrimary,
+      accentAlt: s.primary,
+      accentAltSoft: accentSoft,
+      ok: base.ok,
+      okSoft: base.okSoft,
+      warn: base.warn,
+      warnSoft: base.warnSoft,
+      err: base.err,
+      errSoft: base.errSoft,
+      onErr: base.onErr,
+      info: base.info,
+      infoSoft: base.infoSoft,
+      violet: base.violet,
+      violetSoft: base.violetSoft,
+      shadow: base.shadow,
+      ink: base.ink,
+      onInk: base.onInk,
+      jsonKey: base.jsonKey,
+      jsonString: base.jsonString,
+      jsonNumber: base.jsonNumber,
+      jsonLiteral: base.jsonLiteral,
+      codeBg: mix(surface, canvas, 0.5),
+    );
+  }
+
+  /// The WCAG contrast ratio of two colors, from 1 to 21.
+  static double _contrast(Color a, Color b) {
+    final x = a.computeLuminance();
+    final y = b.computeLuminance();
+    return (math.max(x, y) + 0.05) / (math.min(x, y) + 0.05);
+  }
 
   static AppInspectTokens of(BuildContext context) => Theme.of(context).extension<AppInspectTokens>() ?? light;
 
@@ -188,12 +318,10 @@ abstract final class AppInspectRadius {
   static const double pill = 999;
 }
 
-ThemeData buildAppInspectTheme({required bool dark}) {
-  final t = dark ? AppInspectTokens.dark : AppInspectTokens.light;
-  final scheme = ColorScheme.fromSeed(
-    seedColor: t.accent,
-    brightness: dark ? Brightness.dark : Brightness.light,
-  ).copyWith(
+/// The inspector's Material theme, from [t]. Material widgets the tokens don't
+/// cover build on [scheme], the app's color scheme when [t] comes from it.
+ThemeData buildAppInspectTheme(AppInspectTokens t, {ColorScheme? scheme}) {
+  final colors = (scheme ?? ColorScheme.fromSeed(seedColor: t.accent, brightness: t.brightness)).copyWith(
     primary: t.accent,
     onPrimary: t.onAccent,
     surface: t.surface,
@@ -202,8 +330,9 @@ ThemeData buildAppInspectTheme({required bool dark}) {
     outline: t.border,
     outlineVariant: t.border,
     error: t.err,
+    onError: t.onErr,
   );
-  final base = ThemeData(colorScheme: scheme, useMaterial3: true, brightness: scheme.brightness);
+  final base = ThemeData(colorScheme: colors, useMaterial3: true, brightness: colors.brightness);
   final textTheme = base.textTheme.apply(bodyColor: t.text, displayColor: t.text);
   // Button labels in the platform's font, like the rest of the inspector.
   final buttonText = TextStyle(

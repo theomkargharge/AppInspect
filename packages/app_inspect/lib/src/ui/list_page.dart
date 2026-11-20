@@ -1,11 +1,10 @@
-import 'package:flutter/material.dart';
-
 import '../format.dart';
 import '../models.dart';
 import '../app_inspect.dart';
 import 'detail_page.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'settings_page.dart';
 import 'share_sheet.dart';
 import 'theme.dart';
@@ -43,7 +42,7 @@ class _CallListPageState extends State<CallListPage> {
     if (_filters.isNotEmpty && !_filters.any((f) => _passes(c, f))) return false;
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return true;
-    return '${c.method} ${c.uri} ${c.statusLabel} ${c.visit.name}'.toLowerCase().contains(q);
+    return '${c.method} ${c.uri} ${c.statusLabel} ${c.visit.name} ${c.graphQL?.label ?? ''}'.toLowerCase().contains(q);
   }
 
   void _toggle(_Filter f) => setState(() => _filters.contains(f) ? _filters.remove(f) : _filters.add(f));
@@ -145,7 +144,7 @@ class _CallListPageState extends State<CallListPage> {
                   sliver: SliverToBoxAdapter(
                     child: NlSearchField(
                       controller: _search,
-                      hint: 'Search URL, status or screen',
+                      hint: 'Search URL, operation, status or screen',
                       onChanged: (v) => setState(() => _query = v),
                     ),
                   ),
@@ -284,7 +283,8 @@ class _CallCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppInspectTokens.of(context);
     final fresh = DateTime.now().difference(call.startedAt) < const Duration(seconds: 2);
-    final path = currentMasker().path(call);
+    final masker = currentMasker();
+    final path = callHeadline(call, masker);
     return NlAppear(
       animate: fresh,
       child: Padding(
@@ -294,7 +294,7 @@ class _CallCard extends StatelessWidget {
             MaterialPageRoute<void>(builder: (_) => CallDetailPage(call: call)),
           ),
           onLongPress: () => showCallActions(context, call),
-          semanticLabel: '${call.method} $path, ${call.statusLabel}',
+          semanticLabel: '${callTitle(call, masker)}, ${call.statusLabel}',
           child: Container(
             padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
             decoration: BoxDecoration(
@@ -311,7 +311,7 @@ class _CallCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          NlMethodPill(call.method),
+                          NlOperationPill(call),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(

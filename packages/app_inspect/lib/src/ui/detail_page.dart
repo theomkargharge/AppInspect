@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
-
 import '../format.dart';
+import '../graphql.dart';
 import '../models.dart';
 import '../app_inspect.dart';
 import 'json_view.dart';
 import 'kit.dart';
 import 'kit_controls.dart';
+import 'material.dart';
 import 'share_sheet.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -87,11 +87,11 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
                         onPressed: () => Navigator.of(context).maybePop(),
                       ),
                       const SizedBox(width: 12),
-                      NlMethodPill(call.method),
+                      NlOperationPill(call),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          masker.path(call),
+                          callHeadline(call, masker),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: appInspectMono.copyWith(fontSize: 13.5, fontWeight: FontWeight.w700, color: t.text),
@@ -215,6 +215,10 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
             [
               ('URL', url),
               ('Method', call.method),
+              if (call.graphQL case final graphQL?) ...[
+                ('Operation', graphQL.label),
+                if (graphQL.batchSize > 1) ('Batch', '${graphQL.batchSize} operations in one request'),
+              ],
               ('Status', call.statusLabel),
               ('Screen', call.visit.name),
               ('Started', formatTime(call.startedAt)),
@@ -271,6 +275,14 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
           ]),
         ),
       ],
+      if (call.graphQL case AppInspectGraphQL(:final String query, :final variables)) ...[
+        const SliverToBoxAdapter(child: NlSectionLabel('GraphQL operation')),
+        SliverToBoxAdapter(child: _GraphQLDocument(query.trim())),
+        if (variables != null) ...[
+          const SliverToBoxAdapter(child: NlSectionLabel('Variables')),
+          _BodySliver(body: variables, masker: masker),
+        ],
+      ],
       const SliverToBoxAdapter(child: NlSectionLabel('Body')),
       _BodySliver(body: call.requestBody, masker: masker),
     ]);
@@ -293,7 +305,16 @@ class _CallDetailPageState extends State<CallDetailPage> with SingleTickerProvid
     return _tab([
       const SliverToBoxAdapter(
           child: NlSectionLabel('Raw body, before the app parses it', padding: EdgeInsets.fromLTRB(4, 8, 4, 8))),
-      _BodySliver(body: call.responseBody, masker: masker, highlight: {...?call.parseError?.highlightPaths}),
+      _BodySliver(
+        body: call.responseBody,
+        masker: masker,
+        highlight: {
+          ...?call.parseError?.highlightPaths,
+          // A GraphQL error's path is inside `data`.
+          for (final error in call.graphQLErrors)
+            if (error.path != null) 'data.${error.path}',
+        },
+      ),
       SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.only(top: 14),
@@ -691,3 +712,19 @@ class _BodySliverState extends State<_BodySliver> {
 /// every build, so this tells it when masked output it already made still
 /// holds.
 bool _sameMasking(AppInspectMasker a, AppInspectMasker b) => a.enabled == b.enabled && identical(a.config, b.config);
+
+/// A GraphQL document as sent, in a monospaced card that can be selected
+/// and copied.
+class _GraphQLDocument extends StatelessWidget {
+  const _GraphQLDocument(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppInspectTokens.of(context);
+    return NlCard(
+      child: SelectableText(text, style: appInspectMono.copyWith(fontSize: 12.5, height: 1.5, color: t.text)),
+    );
+  }
+}
